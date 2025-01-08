@@ -6,7 +6,9 @@
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",
+  "orientation": "portrait",
   "scope": "/",
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -20,15 +22,5 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ],
-  "related_applications": [],
-  "prefer_related_applications": false,
-  "shortcuts": [],
-  "share_target": {
-    "action": "/share-target",
-    "method": "GET",
-    "params": {
-      "url": "url"
-    }
-  }
+  ]
 }
