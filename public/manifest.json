@@ -2,7 +2,7 @@
   "name": "AlloIRL",
   "short_name": "AlloIRL",
   "description": "AlloIRL Progressive Web App",
-  "start_url": "/",
+  "start_url": "https://alloirl-git-main-woven-web.vercel.app/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",

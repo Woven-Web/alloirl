@@ -16,8 +16,8 @@ export default function Document() {
         <link rel="apple-touch-startup-image" href="/splash/launch.png" />
 
         {/* Universal Links for iOS */}
-        <meta name="apple-itunes-app" content="app-id=YOUR_APP_ID,app-argument=https://alloirl.com" />
-        <link rel="alternate" href="android-app://com.alloirl/https/alloirl.com" />
+        <meta name="apple-itunes-app" content="app-id=YOUR_APP_ID,app-argument=https://alloirl-git-main-woven-web.vercel.app" />
+        <link rel="alternate" href="android-app://com.alloirl/https/alloirl-git-main-woven-web.vercel.app" />
       </Head>
       <body>
         <Main />
