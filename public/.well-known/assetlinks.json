@@ -6,6 +6,6 @@
     "sha256_cert_fingerprints": [
       "YOUR_APP_FINGERPRINT"
     ],
-    "site": "https://alloirl-git-main-woven-web.vercel.app"
+    "site": "https://alloirl.vercel.app"
   }
 }]
