@@ -3,17 +3,22 @@
     "apps": [],
     "details": [
       {
-        "appIDs": ["alloirl.vercel.app"],
+        "appIDs": ["https://alloirl.vercel.app"],
         "components": [
           {
+            "/": "/",
+            "comment": "Matches root URL"
+          },
+          {
             "/": "/*",
-            "comment": "Matches any URL"
+            "comment": "Matches any URL path"
           }
-        ]
+        ],
+        "paths": ["*"]
       }
     ]
   },
   "webcredentials": {
-    "apps": ["alloirl.vercel.app"]
+    "apps": ["https://alloirl.vercel.app"]
   }
 }

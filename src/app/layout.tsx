@@ -19,7 +19,11 @@ export const metadata: Metadata = {
   },
   other: {
     'apple-touch-startup-image': '/splash.png',
-    'apple-itunes-app': 'app-id=webapp,app-argument=https://alloirl.vercel.app'
+    'apple-itunes-app': 'app-id=webapp,app-argument=https://alloirl.vercel.app',
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+    'apple-mobile-web-app-title': 'AlloIRL'
   }
 }
 
