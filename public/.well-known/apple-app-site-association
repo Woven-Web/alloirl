@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["alloirl.vercel.app"],
+        "components": [
+          {
+            "/": "/*",
+            "comment": "Matches any URL"
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["alloirl.vercel.app"]
+  }
+}

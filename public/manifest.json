@@ -2,7 +2,7 @@
   "name": "AlloIRL",
   "short_name": "AlloIRL",
   "description": "AlloIRL Progressive Web App",
-  "start_url": "/",
+  "start_url": "https://alloirl.vercel.app",
   "id": "/",
   "display": "standalone",
   "orientation": "portrait",

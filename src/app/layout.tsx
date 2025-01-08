@@ -10,12 +10,17 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'default',
     title: 'AlloIRL',
+    startupImage: ['/splash.png']
   },
   viewport: {
     width: 'device-width',
     initialScale: 1,
     maximumScale: 1,
   },
+  other: {
+    'apple-touch-startup-image': '/splash.png',
+    'apple-itunes-app': 'app-id=webapp,app-argument=https://alloirl.vercel.app'
+  }
 }
 
 export default function RootLayout({
