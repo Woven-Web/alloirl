@@ -1,20 +1,21 @@
 import { createClient } from "@/utils/supabase/client";
 import { notFound } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
-import { Button } from "@/components/ui/button";
 
 export default async function EventPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>
 }) {
   const supabase = createClient();
+
+  const eventId = (await params).id
 
   // Fetch event details
   const { data: event } = await supabase
     .from("events_public")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", eventId)
     .single();
 
   if (!event) {
@@ -25,7 +26,7 @@ export default async function EventPage({
   const { data: projects } = await supabase
     .from("projects")
     .select("*")
-    .eq("event_id", params.id);
+    .eq("event_id", eventId);
 
   return (
     <main className="flex-1 p-4 md:p-6">
@@ -41,14 +42,6 @@ export default async function EventPage({
                 <h2 className="text-sm font-medium text-muted-foreground">Starts</h2>
                 <p className="mt-1">
                   {formatDistanceToNow(parseISO(event.start_date))} from now
-                </p>
-              </div>
-              <div className="rounded-lg bg-muted p-4">
-                <h2 className="text-sm font-medium text-muted-foreground">Duration</h2>
-                <p className="mt-1">
-                  {formatDistanceToNow(parseISO(event.start_date), { 
-                    end: parseISO(event.end_date) 
-                  })}
                 </p>
               </div>
             </div>
