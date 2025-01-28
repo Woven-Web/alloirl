@@ -4,6 +4,7 @@ import { encodedRedirect } from "@/utils/utils";
 import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { createAdminClient } from "@/utils/supabase/serverAdmin";
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
@@ -17,6 +18,15 @@ export const signUpAction = async (formData: FormData) => {
       "/sign-up",
       "Email and password are required",
     );
+  }
+
+  const adminClient = await createAdminClient();
+  const { data: currentEvents } = await adminClient.from('events').select('*');
+
+  // TODO: fetch only events happening right now / upcoming events 
+  const emailAllowlist = currentEvents?.map((event) => event.email_allowlist).flat();
+  if (!emailAllowlist?.includes(email)) {
+    return encodedRedirect("error", "/sign-up", "Email is not allowed");
   }
 
   const { error } = await supabase.auth.signUp({
