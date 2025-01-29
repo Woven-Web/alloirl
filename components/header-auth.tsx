@@ -33,13 +33,6 @@ export default async function AuthButton({
   let availableVotes: number | null = null;
   
   if (user) {
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('credits')
-      .eq('id', user.id)
-      .single();
-    profile = profileData;
-
     if (eventId) {
       const { data: eventParticipantData } = await supabase
         .from('event_participants')
@@ -57,43 +50,6 @@ export default async function AuthButton({
         availableVotes = eventParticipantData.available_votes;
     }
 }
-
-  if (!hasEnvVars) {
-    return (
-      <>
-        <div className="flex gap-4 items-center">
-          <div>
-            <Badge
-              variant={"default"}
-              className="font-normal pointer-events-none"
-            >
-              Please update .env.local file with anon key and url
-            </Badge>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              asChild
-              size="sm"
-              variant={"outline"}
-              disabled
-              className="opacity-75 cursor-none pointer-events-none"
-            >
-              <Link href="/sign-in">Sign in</Link>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              variant={"default"}
-              disabled
-              className="opacity-75 cursor-none pointer-events-none"
-            >
-              <Link href="/sign-up">Sign up</Link>
-            </Button>
-          </div>
-        </div>
-      </>
-    );
-  }
 
   return user ? (
     <div className="flex items-center gap-4">

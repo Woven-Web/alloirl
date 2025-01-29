@@ -188,3 +188,78 @@ export const updatePasswordAction = async (formData: FormData) => {
 
   return redirect("/");
 };
+
+export async function allocateVotes(
+  projectId: string,
+  eventId: string,
+  amount: number
+) {
+  const supabase = await createClient();
+  
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // Validate input
+  if (!Number.isInteger(amount) || amount < 0) {
+    throw new Error("Amount must be a non-negative integer");
+  }
+
+  // Get current available votes and sum of previous transactions
+  const { data: participant, error: participantError } = await supabase
+    .from('event_participants')
+    .select('available_votes')
+    .eq('user_id', user.id)
+    .eq('event_id', eventId)
+    .single();
+
+  if (participantError || !participant) {
+    throw new Error("Failed to get participant data");
+  }
+
+  // Get sum of previous transactions for this project
+  const { data: transactionSum } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('user_id', user.id)
+    .eq('event_id', eventId)
+    .eq('project_id', projectId);
+
+  const currentAllocation = transactionSum?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+  const voteDifference = amount - currentAllocation;
+
+  if (participant.available_votes < voteDifference) {
+    throw new Error("Not enough available votes");
+  }
+
+  // Create new transaction
+  const { error: transactionError } = await supabase
+    .from('transactions')
+    .insert({
+      user_id: user.id,
+      event_id: eventId,
+      project_id: projectId,
+      amount: amount,
+      type: 'vote_allocation'
+    });
+
+  if (transactionError) {
+    console.error(transactionError);
+    throw new Error("Failed to create transaction");
+  }
+
+  // Update available votes
+  const { error: updateError } = await supabase
+    .from('event_participants')
+    .update({ 
+      available_votes: participant.available_votes - voteDifference 
+    })
+    .eq('user_id', user.id)
+    .eq('event_id', eventId);
+
+  if (updateError) {
+    throw new Error("Failed to update available votes");
+  }
+
+  return { success: true };
+}

@@ -6,11 +6,11 @@ import Link from "next/link";
 export default async function EventPage({
   params,
 }: {
-  params: Promise<{ id: string }>
+  params: Promise<{ eventId: string }>
 }) {
   const supabase = createClient();
 
-  const eventId = (await params).id
+  const eventId = (await params).eventId
 
   // Fetch event details
   const { data: event } = await supabase
