@@ -5,7 +5,24 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/server";
 
-export default async function AuthButton() {
+interface EventParticipant {
+  id: string;
+  user_id: string;
+  event_id: string;
+  available_votes: number;
+  events_public?: {
+    id: string;
+    name: string;
+  };
+}
+
+export default async function AuthButton({
+  eventId,
+  projectId
+}: {
+  eventId?: string;
+  projectId?: string;
+}) {
   const supabase = await createClient();
 
   const {
@@ -13,6 +30,8 @@ export default async function AuthButton() {
   } = await supabase.auth.getUser();
 
   let profile = null;
+  let availableVotes: number | null = null;
+  
   if (user) {
     const { data: profileData } = await supabase
       .from('profiles')
@@ -20,7 +39,24 @@ export default async function AuthButton() {
       .eq('id', user.id)
       .single();
     profile = profileData;
-  }
+
+    if (eventId) {
+      const { data: eventParticipantData } = await supabase
+        .from('event_participants')
+        .select(`
+          *,
+          events_public (
+            id,
+            name
+          )
+        `)
+        .eq('user_id', user.id)
+        .eq('event_id', eventId)
+        .single() as { data: EventParticipant };
+
+        availableVotes = eventParticipantData.available_votes;
+    }
+}
 
   if (!hasEnvVars) {
     return (
@@ -58,11 +94,12 @@ export default async function AuthButton() {
       </>
     );
   }
+
   return user ? (
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-2">
         <span>{user.email}</span>
-        {profile && <span className="text-sm text-muted-foreground">({profile.credits} credits)</span>}
+        {availableVotes && <span className="text-sm text-muted-foreground">({availableVotes} votes)</span>}
       </div>
       <form action={signOutAction}>
         <Button type="submit" variant={"outline"}>

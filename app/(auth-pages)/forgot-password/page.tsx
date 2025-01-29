@@ -1,4 +1,4 @@
-import { forgotPasswordAction } from "@/app/actions";
+import { resetPasswordAction } from "@/app/actions";
 import { FormMessage, Message } from "@/components/form-message";
 import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,7 @@ export default async function ForgotPassword(props: {
         <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
           <Label htmlFor="email">Email</Label>
           <Input name="email" placeholder="you@example.com" required />
-          <SubmitButton formAction={forgotPasswordAction}>
+          <SubmitButton formAction={resetPasswordAction}>
             Reset Password
           </SubmitButton>
           <FormMessage message={searchParams} />

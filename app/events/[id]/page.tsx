@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/client";
 import { notFound } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
+import Link from "next/link";
 
 export default async function EventPage({
   params,
@@ -55,13 +56,14 @@ export default async function EventPage({
             {projects && projects.length > 0 ? (
               <div className="mt-4 space-y-4">
                 {projects.map((project) => (
-                  <div 
+                  <Link 
                     key={project.id} 
-                    className="rounded-lg border bg-card p-4 transition-colors hover:bg-accent hover:text-accent-foreground"
+                    href={`/events/${eventId}/project/${project.id}`} 
+                    className="block rounded-lg border bg-card p-4 transition-colors hover:bg-accent hover:text-accent-foreground"
                   >
                     <h3 className="font-medium">{project.name}</h3>
                     <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (

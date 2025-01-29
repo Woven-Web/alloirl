@@ -1,35 +1,49 @@
-"use server";
+'use server';
 
-import { encodedRedirect } from "@/utils/utils";
 import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/serverAdmin";
 
+const encodedRedirect = (type: "success" | "error", path: string, message: string) =>
+  redirect(`${path}?message=${encodeURIComponent(message)}&type=${type}`);
+
 export const signUpAction = async (formData: FormData) => {
-  const email = formData.get("email")?.toString();
-  const password = formData.get("password")?.toString();
-  const supabase = await createClient();
-  const origin = (await headers()).get("origin");
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
 
   if (!email || !password) {
     return encodedRedirect(
       "error",
       "/sign-up",
-      "Email and password are required",
+      "Email and password are required"
     );
   }
 
   const adminClient = await createAdminClient();
-  const { data: currentEvents } = await adminClient.from('events').select('*');
 
-  // TODO: fetch only events happening right now / upcoming events 
-  const emailAllowlist = currentEvents?.map((event) => event.email_allowlist).flat();
-  if (!emailAllowlist?.includes(email)) {
-    return encodedRedirect("error", "/sign-up", "Email is not allowed");
+  // Check if email is in allowlist for any current/upcoming event
+  const { data: allowlistRecord, error: allowlistError } = await adminClient
+    .from("event_allowlist")
+    .select("id, event_id")
+    .eq("email", email)
+    .eq("has_registered", false)
+    .single();
+
+  if (allowlistError || !allowlistRecord) {
+    return encodedRedirect(
+      "error", 
+      "/sign-up", 
+      "Email is not allowed or already registered"
+    );
   }
 
-  const { error } = await supabase.auth.signUp({
+  const headersList = await headers();
+  const origin = headersList.get("origin");
+
+  // Create the user account with regular client since it needs to trigger email verification
+  const supabase = await createClient();
+  const { error: signupError, data: authData } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -37,16 +51,57 @@ export const signUpAction = async (formData: FormData) => {
     },
   });
 
-  if (error) {
-    console.error(error.code + " " + error.message);
-    return encodedRedirect("error", "/sign-up", error.message);
-  } else {
-    return encodedRedirect(
-      "success",
-      "/sign-up",
-      "Thanks for signing up! Please check your email for a verification link.",
-    );
+  if (signupError) {
+    console.error(signupError.code + " " + signupError.message);
+    return encodedRedirect("error", "/sign-up", signupError.message);
   }
+
+  const userId = authData?.user?.id;
+  if (!userId) {
+    return encodedRedirect("error", "/sign-up", "Failed to create user");
+  }
+
+  try {
+    // Create event participant record
+    const { error: participantError } = await adminClient
+      .from("event_participants")
+      .insert({
+        event_id: allowlistRecord.event_id,
+        user_id: userId
+      });
+
+    if (participantError) throw participantError;
+
+    // Record initial credit transaction
+    const { error: transactionError } = await adminClient
+      .from("transactions")
+      .insert({
+        user_id: userId,
+        amount: 10,
+        type: 'credit_grant'
+      });
+
+    if (transactionError) throw transactionError;
+
+    // Mark email as registered in allowlist
+    const { error: updateError } = await adminClient
+      .from("event_allowlist")
+      .update({ has_registered: true })
+      .eq("id", allowlistRecord.id);
+
+    if (updateError) throw updateError;
+
+  } catch (error) {
+    console.error("Failed to create user records:", error);
+    // Even if some records fail to create, the user can still verify their email
+    // and we can fix the missing records later if needed
+  }
+
+  return encodedRedirect(
+    "success",
+    "/sign-up",
+    "Thanks for signing up! Please check your email for a verification link."
+  );
 };
 
 export const signInAction = async (formData: FormData) => {
@@ -60,85 +115,76 @@ export const signInAction = async (formData: FormData) => {
   });
 
   if (error) {
-    return encodedRedirect("error", "/sign-in", error.message);
+    return encodedRedirect("error", "/login", "Invalid login credentials");
   }
 
-  return redirect("/protected");
-};
-
-export const forgotPasswordAction = async (formData: FormData) => {
-  const email = formData.get("email")?.toString();
-  const supabase = await createClient();
-  const origin = (await headers()).get("origin");
-  const callbackUrl = formData.get("callbackUrl")?.toString();
-
-  if (!email) {
-    return encodedRedirect("error", "/forgot-password", "Email is required");
-  }
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?redirect_to=/protected/reset-password`,
-  });
-
-  if (error) {
-    console.error(error.message);
-    return encodedRedirect(
-      "error",
-      "/forgot-password",
-      "Could not reset password",
-    );
-  }
-
-  if (callbackUrl) {
-    return redirect(callbackUrl);
-  }
-
-  return encodedRedirect(
-    "success",
-    "/forgot-password",
-    "Check your email for a link to reset your password.",
-  );
-};
-
-export const resetPasswordAction = async (formData: FormData) => {
-  const supabase = await createClient();
-
-  const password = formData.get("password") as string;
-  const confirmPassword = formData.get("confirmPassword") as string;
-
-  if (!password || !confirmPassword) {
-    encodedRedirect(
-      "error",
-      "/protected/reset-password",
-      "Password and confirm password are required",
-    );
-  }
-
-  if (password !== confirmPassword) {
-    encodedRedirect(
-      "error",
-      "/protected/reset-password",
-      "Passwords do not match",
-    );
-  }
-
-  const { error } = await supabase.auth.updateUser({
-    password: password,
-  });
-
-  if (error) {
-    encodedRedirect(
-      "error",
-      "/protected/reset-password",
-      "Password update failed",
-    );
-  }
-
-  encodedRedirect("success", "/protected/reset-password", "Password updated");
+  return redirect("/");
 };
 
 export const signOutAction = async () => {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  return redirect("/sign-in");
+  return redirect("/login");
+};
+
+export const resetPasswordAction = async (formData: FormData) => {
+  const email = formData.get("email") as string;
+  const supabase = await createClient();
+  const headersList = await headers();
+  const origin = headersList.get("origin");
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/protected/reset-password`,
+  });
+
+  if (error) {
+    return encodedRedirect(
+      "error",
+      "/forgot-password",
+      "Could not reset password"
+    );
+  }
+
+  return encodedRedirect(
+    "success",
+    "/forgot-password",
+    "Check your email for a link to reset your password."
+  );
+};
+
+export const updatePasswordAction = async (formData: FormData) => {
+  const password = formData.get("password") as string;
+  const passwordConfirm = formData.get("passwordConfirm") as string;
+
+  if (!password || !passwordConfirm) {
+    return encodedRedirect(
+      "error",
+      "/protected/reset-password",
+      "Password and confirm password are required"
+    );
+  }
+
+  if (password !== passwordConfirm) {
+    return encodedRedirect(
+      "error",
+      "/protected/reset-password",
+      "Passwords do not match"
+    );
+  }
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.auth.updateUser({
+    password,
+  });
+
+  if (error) {
+    return encodedRedirect(
+      "error",
+      "/protected/reset-password",
+      "Password update failed"
+    );
+  }
+
+  return redirect("/");
 };
