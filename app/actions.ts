@@ -217,18 +217,9 @@ export async function allocateVotes(
     throw new Error("Failed to get participant data");
   }
 
-  // Get sum of previous transactions for this project
-  const { data: transactionSum } = await supabase
-    .from('transactions')
-    .select('amount')
-    .eq('user_id', user.id)
-    .eq('event_id', eventId)
-    .eq('project_id', projectId);
+  const availableVotes = participant.available_votes;
 
-  const currentAllocation = transactionSum?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-  const voteDifference = amount - currentAllocation;
-
-  if (participant.available_votes < voteDifference) {
+  if (availableVotes < amount) {
     throw new Error("Not enough available votes");
   }
 
@@ -252,12 +243,13 @@ export async function allocateVotes(
   const { error: updateError } = await supabase
     .from('event_participants')
     .update({ 
-      available_votes: participant.available_votes - voteDifference 
+      available_votes: participant.available_votes - amount
     })
     .eq('user_id', user.id)
     .eq('event_id', eventId);
 
   if (updateError) {
+    console.log({updateError});
     throw new Error("Failed to update available votes");
   }
 
