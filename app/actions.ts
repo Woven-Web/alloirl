@@ -255,3 +255,53 @@ export async function allocateVotes(
 
   return { success: true };
 }
+
+export async function purchaseCredits(amount: number) {
+  const supabase = await createAdminClient();
+  
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect("error", "/top-up", "You must be signed in to purchase credits");
+  }
+
+  // Start a transaction to update credits
+  const { data: participant, error: participantError } = await supabase
+    .from("event_participants")
+    .select("id, available_votes")
+    .eq("user_id", user.id)
+    .single();
+
+  if (participantError) {
+    return encodedRedirect("error", "/top-up", "Failed to find participant record");
+  }
+
+  // Record credit purchase transaction
+  const { error: transactionError } = await supabase
+    .from("transactions")
+    .insert({
+      user_id: user.id,
+      amount: amount,
+      type: "credit_grant"
+    });
+
+  if (transactionError) {
+    return encodedRedirect("error", "/top-up", "Failed to record transaction");
+  }
+
+  // Update available votes
+  const { error: updateError } = await supabase
+    .from("event_participants")
+    .update({ 
+      available_votes: (participant.available_votes || 0) + amount 
+    })
+    .eq("id", participant.id);
+
+  if (updateError) {
+    return encodedRedirect("error", "/top-up", "Failed to update credits");
+  }
+
+  return encodedRedirect("success", "/top-up", "Credits purchased successfully");
+}

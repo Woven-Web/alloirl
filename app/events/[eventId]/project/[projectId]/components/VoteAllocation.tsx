@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { allocateVotes } from "@/app/actions";
 import { createClient } from "@/utils/supabase/client";
+import Link from "next/link";
 // import { useToast } from "@/components/ui/use-toast";
 
 interface EventParticipant {
@@ -12,7 +13,7 @@ interface EventParticipant {
   user_id: string;
   event_id: string;
   available_votes: number;
-  events_public?: {
+  events?: {
     id: string;
     name: string;
   };
@@ -40,7 +41,7 @@ export function VoteAllocation({
 
   useEffect(() => {
     const channel = supabase
-      .channel('participants')
+      .channel('participants_vote_allocation')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -79,6 +80,14 @@ export function VoteAllocation({
     <div className="rounded-lg border p-4 flex flex-col space-y-2">
       <h3 className="text-lg font-semibold mb-2">Allocate Votes</h3>
       <p>Available: {localParticipantData?.available_votes}</p>
+
+      <Link href={`/top-up`}>
+        <Button
+          variant="outline"
+        >
+          Top up on credits
+        </Button>
+      </Link>
       <div className="flex items-center space-x-2">
         <Input 
           type="number"

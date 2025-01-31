@@ -4,7 +4,7 @@ import { formatDistanceToNow, parseISO } from "date-fns";
 
 export default async function Home() {
   const client = createClient();
-  const { data: eventsPublic } = await client.from('events_public').select('*');
+  const { data: eventsPublic } = await client.from('events').select('*');
 
   return (
     <>

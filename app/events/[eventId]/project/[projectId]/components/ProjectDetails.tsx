@@ -23,7 +23,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
     // Set up real-time subscription
     const client = createClient();
     const channel = client
-      .channel('votes')
+      .channel('project_details')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 

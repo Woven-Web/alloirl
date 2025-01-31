@@ -14,7 +14,7 @@ export default async function EventPage({
 
   // Fetch event details
   const { data: event } = await supabase
-    .from("events_public")
+    .from("events")
     .select("*")
     .eq("id", eventId)
     .single();
