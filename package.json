@@ -3,6 +3,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "pull-schema": "bash export-schema.sh",
     "start": "next start"
   },
   "dependencies": {
