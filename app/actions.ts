@@ -3,305 +3,172 @@
 import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createAdminClient } from "@/utils/supabase/serverAdmin";
 
 const encodedRedirect = (type: "success" | "error", path: string, message: string) =>
   redirect(`${path}?message=${encodeURIComponent(message)}&type=${type}`);
 
-export const signUpAction = async (formData: FormData) => {
+export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
 
-  if (!email || !password) {
+  if (!email) {
     return encodedRedirect(
       "error",
-      "/sign-up",
-      "Email and password are required"
-    );
-  }
-
-  const adminClient = await createAdminClient();
-
-  // Check if email is in allowlist for any current/upcoming event
-  const { data: allowlistRecord, error: allowlistError } = await adminClient
-    .from("event_allowlist")
-    .select("id, event_id")
-    .eq("email", email)
-    .eq("has_registered", false)
-    .single();
-
-  if (allowlistError || !allowlistRecord) {
-    return encodedRedirect(
-      "error", 
-      "/sign-up", 
-      "Email is not allowed or already registered"
+      "/sign-in",
+      "Email is required"
     );
   }
 
   const headersList = await headers();
   const origin = headersList.get("origin");
 
-  // Create the user account with regular client since it needs to trigger email verification
   const supabase = await createClient();
-  const { error: signupError, data: authData } = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signInWithOtp({
     email,
-    password,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
     },
   });
 
-  if (signupError) {
-    console.error(signupError.code + " " + signupError.message);
-    return encodedRedirect("error", "/sign-up", signupError.message);
-  }
-
-  const userId = authData?.user?.id;
-  if (!userId) {
-    return encodedRedirect("error", "/sign-up", "Failed to create user");
-  }
-
-  try {
-    // Create event participant record
-    const { error: participantError } = await adminClient
-      .from("event_participants")
-      .insert({
-        event_id: allowlistRecord.event_id,
-        user_id: userId
-      });
-
-    if (participantError) throw participantError;
-
-    // Record initial credit transaction
-    const { error: transactionError } = await adminClient
-      .from("transactions")
-      .insert({
-        user_id: userId,
-        amount: 10,
-        type: 'credit_grant'
-      });
-
-    if (transactionError) throw transactionError;
-
-    // Mark email as registered in allowlist
-    const { error: updateError } = await adminClient
-      .from("event_allowlist")
-      .update({ has_registered: true })
-      .eq("id", allowlistRecord.id);
-
-    if (updateError) throw updateError;
-
-  } catch (error) {
-    console.error("Failed to create user records:", error);
-    // Even if some records fail to create, the user can still verify their email
-    // and we can fix the missing records later if needed
+  if (error) {
+    return encodedRedirect(
+      "error",
+      "/sign-in",
+      error.message
+    );
   }
 
   return encodedRedirect(
     "success",
-    "/sign-up",
-    "Thanks for signing up! Please check your email for a verification link."
+    "/sign-in",
+    "Check your email for the sign-in link"
   );
-};
-
-export const signInAction = async (formData: FormData) => {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
-  const supabase = await createClient();
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    return encodedRedirect("error", "/login", "Invalid login credentials");
-  }
-
-  return redirect("/");
 };
 
 export const signOutAction = async () => {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  return redirect("/login");
+  return redirect("/");
 };
 
-export const resetPasswordAction = async (formData: FormData) => {
-  const email = formData.get("email") as string;
+export const allocateVotes = async (projectId: string, eventId: string, amount: number) => {
   const supabase = await createClient();
-  const headersList = await headers();
-  const origin = headersList.get("origin");
+  const { data: { user } } = await supabase.auth.getUser();
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=/protected/reset-password`,
-  });
-
-  if (error) {
+  if (!user) {
     return encodedRedirect(
       "error",
-      "/forgot-password",
-      "Could not reset password"
+      `/events/${eventId}/projects/${projectId}`,
+      "You must be signed in to vote"
+    );
+  }
+
+  // Get current event participant
+  const { data: eventParticipant, error: participantError } = await supabase
+    .from("event_participants")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("event_id", eventId)
+    .single();
+
+  if (participantError || !eventParticipant) {
+    return encodedRedirect(
+      "error",
+      `/events/${eventId}/projects/${projectId}`,
+      "You are not a participant in this event"
+    );
+  }
+
+  // Check if they have enough votes
+  if (eventParticipant.available_votes < amount) {
+    return encodedRedirect(
+      "error",
+      `/events/${eventId}/projects/${projectId}`,
+      "You don't have enough votes"
+    );
+  }
+
+  // Insert vote
+  const { error: voteError } = await supabase
+    .from("votes")
+    .insert({
+      user_id: user.id,
+      project_id: projectId,
+      amount,
+    });
+
+  if (voteError) {
+    return encodedRedirect(
+      "error",
+      `/events/${eventId}/projects/${projectId}`,
+      "Failed to submit vote"
+    );
+  }
+
+  // Update available votes
+  const { error: updateError } = await supabase
+    .from("event_participants")
+    .update({ available_votes: eventParticipant.available_votes - amount })
+    .eq("id", eventParticipant.id);
+
+  if (updateError) {
+    return encodedRedirect(
+      "error",
+      `/events/${eventId}/projects/${projectId}`,
+      "Failed to update available votes"
     );
   }
 
   return encodedRedirect(
     "success",
-    "/forgot-password",
-    "Check your email for a link to reset your password."
+    `/events/${eventId}/projects/${projectId}`,
+    `Successfully allocated ${amount} vote${amount === 1 ? '' : 's'}`
   );
 };
 
-export const updatePasswordAction = async (formData: FormData) => {
-  const password = formData.get("password") as string;
-  const passwordConfirm = formData.get("passwordConfirm") as string;
-
-  if (!password || !passwordConfirm) {
-    return encodedRedirect(
-      "error",
-      "/protected/reset-password",
-      "Password and confirm password are required"
-    );
-  }
-
-  if (password !== passwordConfirm) {
-    return encodedRedirect(
-      "error",
-      "/protected/reset-password",
-      "Passwords do not match"
-    );
-  }
-
+export const purchaseCredits = async (amount: number) => {
   const supabase = await createClient();
-
-  const { error } = await supabase.auth.updateUser({
-    password,
-  });
-
-  if (error) {
-    return encodedRedirect(
-      "error",
-      "/protected/reset-password",
-      "Password update failed"
-    );
-  }
-
-  return redirect("/");
-};
-
-export async function allocateVotes(
-  projectId: string,
-  eventId: string,
-  amount: number
-) {
-  const supabase = await createClient();
-  
-  // Get current user
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated");
-
-  // Validate input
-  if (!Number.isInteger(amount) || amount < 0) {
-    throw new Error("Amount must be a non-negative integer");
-  }
-
-  // Get current available votes and sum of previous transactions
-  const { data: participant, error: participantError } = await supabase
-    .from('event_participants')
-    .select('available_votes')
-    .eq('user_id', user.id)
-    .eq('event_id', eventId)
-    .single();
-
-  if (participantError || !participant) {
-    throw new Error("Failed to get participant data");
-  }
-
-  const availableVotes = participant.available_votes;
-
-  if (availableVotes < amount) {
-    throw new Error("Not enough available votes");
-  }
-
-  // Create new transaction
-  const { error: transactionError } = await supabase
-    .from('transactions')
-    .insert({
-      user_id: user.id,
-      event_id: eventId,
-      project_id: projectId,
-      amount: amount,
-      type: 'vote_allocation'
-    });
-
-  if (transactionError) {
-    console.error(transactionError);
-    throw new Error("Failed to create transaction");
-  }
-
-  // Update available votes
-  const { error: updateError } = await supabase
-    .from('event_participants')
-    .update({ 
-      available_votes: participant.available_votes - amount
-    })
-    .eq('user_id', user.id)
-    .eq('event_id', eventId);
-
-  if (updateError) {
-    console.log({updateError});
-    throw new Error("Failed to update available votes");
-  }
-
-  return { success: true };
-}
-
-export async function purchaseCredits(amount: number) {
-  const supabase = await createAdminClient();
-  
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   if (!user) {
-    return encodedRedirect("error", "/top-up", "You must be signed in to purchase credits");
+    return encodedRedirect(
+      "error",
+      `/credits`,
+      "You must be signed in to purchase credits"
+    );
   }
 
-  // Start a transaction to update credits
-  const { data: participant, error: participantError } = await supabase
+  // Get current event participant
+  const { data: eventParticipant, error: participantError } = await supabase
     .from("event_participants")
-    .select("id, available_votes")
+    .select("*")
     .eq("user_id", user.id)
     .single();
 
-  if (participantError) {
-    return encodedRedirect("error", "/top-up", "Failed to find participant record");
-  }
-
-  // Record credit purchase transaction
-  const { error: transactionError } = await supabase
-    .from("transactions")
-    .insert({
-      user_id: user.id,
-      amount: amount,
-      type: "credit_grant"
-    });
-
-  if (transactionError) {
-    return encodedRedirect("error", "/top-up", "Failed to record transaction");
+  if (participantError || !eventParticipant) {
+    return encodedRedirect(
+      "error",
+      `/credits`,
+      "You are not a participant in any event"
+    );
   }
 
   // Update available votes
   const { error: updateError } = await supabase
     .from("event_participants")
-    .update({ 
-      available_votes: (participant.available_votes || 0) + amount 
-    })
-    .eq("id", participant.id);
+    .update({ available_votes: eventParticipant.available_votes + amount })
+    .eq("id", eventParticipant.id);
 
   if (updateError) {
-    return encodedRedirect("error", "/top-up", "Failed to update credits");
+    return encodedRedirect(
+      "error",
+      `/credits`,
+      "Failed to update available votes"
+    );
   }
 
-  return encodedRedirect("success", "/top-up", "Credits purchased successfully");
-}
+  return encodedRedirect(
+    "success",
+    `/credits`,
+    `Successfully purchased ${amount} credit${amount === 1 ? '' : 's'}`
+  );
+};

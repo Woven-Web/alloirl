@@ -21,6 +21,7 @@ interface EventParticipant {
 }
 
 export default function HeaderAuth() {
+  const [mounted, setMounted] = useState(false);
   const params = useParams();
   const eventId = params?.eventId as string;
   const projectId = params?.projectId as string;
@@ -51,6 +52,7 @@ export default function HeaderAuth() {
   };
 
   useEffect(() => {
+    setMounted(true);
     const fetchData = async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -79,6 +81,9 @@ export default function HeaderAuth() {
     fetchData();
   }, [eventId]);
 
+  // Don't render anything until mounted to prevent hydration mismatch
+  if (!mounted) return null;
+
   return user ? (
     <div className="flex items-center gap-4">
       <div className="flex items-center gap-2">
@@ -93,11 +98,8 @@ export default function HeaderAuth() {
     </div>
   ) : (
     <div className="flex gap-2">
-      <Button asChild size="sm" variant={"outline"}>
-        <Link href="/sign-in">Sign in</Link>
-      </Button>
       <Button asChild size="sm" variant={"default"}>
-        <Link href="/sign-up">Sign up</Link>
+        <Link href="/sign-in">Sign in with Email</Link>
       </Button>
     </div>
   );
