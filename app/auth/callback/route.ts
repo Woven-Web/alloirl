@@ -7,18 +7,27 @@ export async function GET(request: Request) {
   // https://supabase.com/docs/guides/auth/server-side/nextjs
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const origin = requestUrl.origin;
-  const redirectTo = requestUrl.searchParams.get("redirect_to")?.toString();
 
   if (code) {
-    const supabase = await createClient();
-    await supabase.auth.exchangeCodeForSession(code);
+    const supabase = await createClient()
+    
+    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (!error) {
+      // Check if user has requested name
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profile } = await supabase.from('profiles')
+        .select('name_requested')
+        .eq('id', user?.id)
+        .single()
+
+      // Redirect to name page if name not yet requested
+      if (!profile?.name_requested) {
+        return NextResponse.redirect(new URL('/username', requestUrl.origin))
+      }
+    }
   }
 
-  if (redirectTo) {
-    return NextResponse.redirect(`${origin}${redirectTo}`);
-  }
-
-  // URL to redirect to after sign up process completes
-  return NextResponse.redirect(origin);
+  // Redirect to home page
+  return NextResponse.redirect(new URL('/', requestUrl.origin))
 }

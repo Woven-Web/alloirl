@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import { CreditSelection } from "./components/CreditSelection";
-import { Message } from "@/app/components/Message";
+import { Message } from "../../components/Message";
 
 export default async function TopUpPage({
   searchParams,
