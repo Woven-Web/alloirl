@@ -29,17 +29,17 @@ export default function RootLayout({
   return (
     <html lang="en" className={geistSans.className} suppressHydrationWarning>
       <body className="bg-brand-yellow" suppressHydrationWarning>
-        <main className="min-h-screen flex flex-col items-center">
-          <div className="flex-1 w-full flex flex-col gap-20 items-center">
-            <nav className="w-full flex justify-between items-center p-4">
+        <main className="min-h-screen flex flex-col">
+          <nav className="w-full flex justify-between items-center p-4">
+            <div className="w-full max-w-5xl mx-auto flex justify-between items-center">
               <Link href="/" className="text-brand-blue">
                 <AlloLogo width={32} height={32} />
               </Link>
               {!hasEnvVars ? <EnvVarWarning /> : <HeaderAuth />}
-            </nav>
-            <div className="flex flex-col gap-20 max-w-5xl p-5">
-              {children}
             </div>
+          </nav>
+          <div className="flex-1 w-full max-w-5xl mx-auto">
+            {children}
           </div>
         </main>
       </body>

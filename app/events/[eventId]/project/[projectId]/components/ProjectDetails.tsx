@@ -55,15 +55,9 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
   }
 
   return (
-    <div className="bg-gray-600 rounded-lg shadow p-6">
-      <h1 className="text-white text-2xl font-bold mb-2">{project.name}</h1>
-      {project.description && (
-        <p className="text-white">{project.description}</p>
-      )}
-      <div className="mt-4 text-white">
-        <p>Total Votes: {votes.total}</p>
-        <p>Unique Voters: {votes.unique}</p>
-      </div>
+    <div className="space-y-4">
+      <h1 className="text-brand-blue font-title text-4xl">{project.name}</h1>
+      <p className="text-brand-blue font-eyebrow text-xl">{votes.total} Votes</p>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PrimaryButton } from "@/components/ui/primary-button";
+import { NumberInput } from "@/components/ui/number-input";
 import { useState, useEffect } from "react";
 import { allocateVotes } from "@/app/actions";
 import { createClient } from "@/utils/supabase/client";
@@ -37,6 +37,7 @@ export function VoteAllocation({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localParticipantData, setLocalParticipantData] = useState(participantData);
+  const [recentAllocations, setRecentAllocations] = useState<any[]>([]);
   const supabase = createClient();
 
   useEffect(() => {
@@ -48,7 +49,6 @@ export function VoteAllocation({
         table: 'event_participants',
         filter: `id=eq.${participantData?.id}` 
       }, (payload) => {
-        console.log('VoteAllocationpayload', payload);
         setLocalParticipantData(payload.new as EventParticipant);
       })
       .subscribe();
@@ -77,35 +77,42 @@ export function VoteAllocation({
   };
 
   return (
-    <div className="rounded-lg border p-4 flex flex-col space-y-2">
-      <h3 className="text-lg font-semibold mb-2">Allocate Votes</h3>
-      <p>Available: {localParticipantData?.available_votes}</p>
+    <div className="flex-1 flex flex-col">
+      <div className="flex-1 space-y-4 overflow-auto">
+        <h2 className="text-brand-blue font-eyebrow text-4xl">Recent Allocations</h2>
+        <div className="space-y-2">
+          {recentAllocations.map((allocation) => (
+            <div key={allocation.id} className="text-brand-blue font-eyebrow text-lg">
+              {allocation.time} | {allocation.user} | {allocation.votes}
+            </div>
+          ))}
+        </div>
+      </div>
 
-      <Link href={`/top-up`}>
-        <Button
-          variant="outline"
-        >
-          Top up on credits
-        </Button>
-      </Link>
-      <div className="flex items-center space-x-2">
-        <Input 
-          type="number"
-          min={0}
-          onChange={(e) => {
-            const value = e.target.value === '' ? 0 : parseInt(e.target.value);
-            if (!isNaN(value) && value >= 0) {
-              setAllocatingVotes(value);
-            }
-          }}
-          value={allocatingVotes || ''}
-        />
-        <Button 
-          onClick={submitAllocation} 
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "Allocating..." : "Allocate"}
-        </Button>
+      <div className="mt-8 pb-8">
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-brand-blue font-eyebrow text-lg">allocate</span>
+          <span className="text-brand-blue font-eyebrow text-sm">{localParticipantData?.available_votes ?? 0} available</span>
+        </div>
+        <div className="flex gap-4">
+          <NumberInput
+            min={0}
+            max={localParticipantData?.available_votes ?? 0}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+              if (!isNaN(value) && value >= 0) {
+                setAllocatingVotes(value);
+              }
+            }}
+            value={allocatingVotes || ''}
+          />
+          <PrimaryButton 
+            onClick={submitAllocation} 
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Allocating..." : "Allocate"}
+          </PrimaryButton>
+        </div>
       </div>
     </div>
   );
