@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { FormMessage } from "@/components/form-message";
-import Link from "next/link";
 
 export default function UsernameForm() {
   const [name, setName] = useState("");
@@ -64,6 +63,34 @@ export default function UsernameForm() {
     }
   };
 
+  const handleUseGeneratedName = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("User not found");
+      
+      // Get the last 8 characters of the UUID
+      const generatedName = user.id.slice(-8);
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          name: generatedName,
+        })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      router.push("/?message=Name set successfully!&type=success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="w-full space-y-5">
       <Input
@@ -88,12 +115,14 @@ export default function UsernameForm() {
       >
         {loading ? "Saving..." : "Save Name"}
       </button>
-      <Link
-        href="/"
+      <button
+        type="button"
+        onClick={handleUseGeneratedName}
+        disabled={loading}
         className="w-full h-[60px] border-2 border-brand-blue/30 rounded-[10px] font-eyebrow text-lg text-brand-blue text-center flex items-center justify-center hover:bg-brand-blue/5 transition-colors"
       >
         Use Generated Name
-      </Link>
+      </button>
     </form>
   );
 }
