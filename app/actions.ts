@@ -1,7 +1,6 @@
 "use server";
 
 import { createClient } from "@/utils/supabase/server";
-import { z } from "zod";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/serverAdmin";
