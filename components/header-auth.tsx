@@ -28,6 +28,7 @@ export default function HeaderAuth() {
   const [user, setUser] = useState<any>(null);
   const [eventParticipant, setEventParticipant] = useState<EventParticipant | null>(null);
   const [availableVotes, setAvailableVotes] = useState<number | null>(null);
+  const [profile, setProfile] = useState<{ name: string | null } | null>(null);
 
   const fetchEventParticipant = async (userId: string) => {
     console.log('header-auth fetchEventParticipant');
@@ -57,6 +58,16 @@ export default function HeaderAuth() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+
+      if (user) {
+        // Fetch user profile
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+        setProfile(profileData);
+      }
 
       if (user && eventId) {
         await fetchEventParticipant(user.id);
@@ -90,7 +101,7 @@ export default function HeaderAuth() {
         {availableVotes ?? 0} votes
       </Link>
       <span>|</span>
-      <span>{user.email}</span>
+      <span>{profile?.name || user.email}</span>
       <span>|</span>
       <form action={signOutAction}>
         <button type="submit" className="hover:opacity-80">
