@@ -85,22 +85,24 @@ export default function HeaderAuth() {
   if (!mounted) return null;
 
   return user ? (
-    <div className="flex items-center gap-4">
-      <div className="flex items-center gap-2">
-        <span>{user.email}</span>
-        {availableVotes && <span className="text-sm text-muted-foreground">({availableVotes} votes)</span>}
-      </div>
+    <div className="flex items-center gap-4 text-brand-blue font-eyebrow text-sm">
+      <Link href="/votes" className="hover:opacity-80">
+        {availableVotes ?? 0} votes
+      </Link>
+      <span>|</span>
+      <span>{user.email}</span>
+      <span>|</span>
       <form action={signOutAction}>
-        <Button type="submit" variant={"outline"}>
-          Sign out
-        </Button>
+        <button type="submit" className="hover:opacity-80">
+          logout
+        </button>
       </form>
     </div>
   ) : (
     <div className="flex gap-2">
-      <Button asChild size="sm" variant={"default"}>
-        <Link href="/sign-in">Sign in with Email</Link>
-      </Button>
+      <Link href="/sign-in" className="text-brand-blue font-eyebrow text-sm hover:opacity-80">
+        Sign in
+      </Link>
     </div>
   );
 }
