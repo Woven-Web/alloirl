@@ -28,7 +28,9 @@ export default async function Login(props: { searchParams: Promise<Message> }) {
         >
           Enter
         </SubmitButton>
-        <FormMessage message={searchParams} className="text-center font-eyebrow text-sm text-brand-blue" />
+        <div className="text-center font-eyebrow text-sm text-brand-blue">
+          <FormMessage message={searchParams}  />
+        </div>
       </form>
     </div>
   );

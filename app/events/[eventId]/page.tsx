@@ -62,7 +62,7 @@ export default async function EventPage({
                     className="block rounded-lg border bg-card p-4 transition-colors hover:bg-accent hover:text-accent-foreground"
                   >
                     <h3 className="font-medium">{project.name}</h3>
-                    <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{project.description?.slice(0, 250)}{project.description?.length > 250 ? '...' : ''}</p>
                   </Link>
                 ))}
               </div>
