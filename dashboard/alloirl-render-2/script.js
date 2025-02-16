@@ -5,10 +5,10 @@ const CONFIG = {
         height: 500,
     },
     margin: { 
-        top: 40,    // Space for time labels
-        right: 0,   // Projects are in their own column
-        bottom: 20,
-        left: 0     // No left margin needed
+        top: 0,    // Remove top margin to align with attendees
+        right: 0,   
+        bottom: 0,
+        left: 0     
     },
     project: {
         width: 200,
@@ -24,7 +24,22 @@ const CONFIG = {
     time: {
         interval: 15,     // minutes between time slots
         slots: 24,        // 6 hours = 24 15-minute slots
-        format: d3.timeFormat("%I:%M %p")
+        format: (time) => {
+            // Custom format to show "10 PM", "11 PM", etc.
+            const hours = time.getHours();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            const displayHours = hours % 12 || 12; // Convert 0 to 12
+            return `${displayHours}${ampm}`;
+        }
+    },
+    attendees: {
+        count: 20,        // Number of attendees to generate
+        minCredits: 0,    // Minimum credits per attendee
+        maxCredits: 100   // Maximum credits per attendee
+    },
+    grid: {
+        rowHeight: 45,    // Match the attendee height
+        verticalPadding: 0
     }
 };
 
@@ -49,9 +64,10 @@ function generateTimeSlots() {
     now.setSeconds(0);
     now.setMilliseconds(0);
 
-    return Array.from({ length: CONFIG.time.slots - 1 }, (_, i) => {
+    return Array.from({ length: CONFIG.time.slots }, (_, i) => {
         const time = new Date(now);
-        time.setMinutes(time.getMinutes() - (CONFIG.time.interval * (i + 1))); // Start one interval back
+        // Remove the +1 so we start at the current time
+        time.setMinutes(time.getMinutes() - (CONFIG.time.interval * i));
         return {
             timestamp: time,
             displayTime: CONFIG.time.format(time),
@@ -64,7 +80,7 @@ function generateTimeSlots() {
  * Generates the complete dataset for visualization
  * @param {number} npl - Nodes per line
  * @param {Object} dims - Visualization dimensions
- * @returns {Object} Dataset with timeSlots and projects
+ * @returns {Object} Dataset with timeSlots, projects, and attendees
  */
 function generateData(npl, dims) {
     const timeSlots = generateTimeSlots();
@@ -76,32 +92,61 @@ function generateData(npl, dims) {
         votes: []
     }));
 
-    // Generate random votes for each time slot
-    timeSlots.forEach((slot, slotIndex) => {
-        for (let i = 0; i < npl; i++) {
-            const voteId = `vote_${slotIndex}_${i}`;
-            const projectIndex = Math.floor(Math.random() * projects.length);
+    // Generate attendees
+    const attendees = Array.from({ length: CONFIG.attendees.count }, (_, id) => ({
+        id: id + 1,
+        displayId: `Attendee#${String(id + 1).padStart(3, '0')}`,
+        credits: Math.floor(Math.random() * (CONFIG.attendees.maxCredits - CONFIG.attendees.minCredits + 1)) + CONFIG.attendees.minCredits,
+        votes: [],
+        lane: id
+    }));
+
+    // Calculate lane height based on fixed grid
+    const laneHeight = CONFIG.grid.rowHeight;
+
+    // Generate votes for each attendee in each time slot
+    attendees.forEach((attendee) => {
+        timeSlots.forEach((slot, slotIndex) => {
+            // 20% chance of voting in this time slot (reduced from 30%)
+            if (Math.random() > 0.2) return;
             
-            // Add vote to time slot
-            slot.votes.push({
-                id: voteId,
-                projectId: projects[projectIndex].id,
-                yPosition: Math.random() * dims.height
-            });
+            // 1-2 votes when they do vote
+            const votesThisSlot = Math.floor(Math.random() * 2) + 1;
             
-            // Cross-reference vote in project
-            projects[projectIndex].votes.push({
-                timeSlotIndex: slotIndex,
-                voteId: voteId
-            });
-        }
+            for (let i = 0; i < votesThisSlot; i++) {
+                const voteId = `vote_${slotIndex}_${attendee.id}_${i}`;
+                const projectIndex = Math.floor(Math.random() * projects.length);
+                
+                // Add vote to time slot with fixed y-position based on attendee's lane
+                slot.votes.push({
+                    id: voteId,
+                    projectId: projects[projectIndex].id,
+                    attendeeId: attendee.id,
+                    yPosition: (attendee.lane * laneHeight) + (laneHeight / 2)
+                });
+                
+                // Cross-reference vote in project
+                projects[projectIndex].votes.push({
+                    timeSlotIndex: slotIndex,
+                    voteId: voteId,
+                    attendeeId: attendee.id
+                });
+
+                // Cross-reference vote in attendee
+                attendee.votes.push({
+                    timeSlotIndex: slotIndex,
+                    voteId: voteId,
+                    projectId: projects[projectIndex].id
+                });
+            }
+        });
     });
 
-    return { timeSlots, projects };
+    return { timeSlots, projects, attendees };
 }
 
 /**
- * Creates the timeline visualization
+ * Creates the visualization
  * @param {Object} data - The dataset to visualize
  * @param {Object} config - Configuration options
  * @param {Object} dims - Visualization dimensions
@@ -116,8 +161,29 @@ function createVisualization(data, config, dims) {
     
     // Draw components
     drawTimeline(svg, data, timeScale, height);
+    drawAttendees(data.attendees);
+    drawAttendeeGridLines(svg, data.attendees, height);
     const projectPositions = drawProjects(data.projects);
     drawConnections(svg, data, timeScale, projectPositions);
+}
+
+/**
+ * Draws horizontal grid lines for attendee lanes
+ * @param {d3.Selection} svg - The SVG container
+ * @param {Array} attendees - The attendees array
+ * @param {number} height - The visualization height
+ */
+function drawAttendeeGridLines(svg, attendees, height) {
+    // Draw horizontal grid lines for all lanes including first and last
+    svg.selectAll(".grid-line")
+        .data(attendees)
+        .enter()
+        .append("line")
+        .attr("class", "grid-line")
+        .attr("x1", 0)
+        .attr("x2", "100%")
+        .attr("y1", (d, i) => i * CONFIG.grid.rowHeight)
+        .attr("y2", (d, i) => i * CONFIG.grid.rowHeight);
 }
 
 /**
@@ -159,27 +225,34 @@ function createTimeScale(data, width) {
  * @param {number} height - The visualization height
  */
 function drawTimeline(svg, data, timeScale, height) {
+    // Clear existing timeline header
+    const timeHeader = d3.select("#timeline-header").html('');
+    
     data.timeSlots.forEach((slot, i) => {
         const x = timeScale(slot.timestamp);
         
-        // Time marker
+        // Time marker in visualization
         svg.append("line")
             .attr("class", "time-marker")
             .attr("x1", x)
             .attr("x2", x)
             .attr("y1", 0)
-            .attr("y2", height)
-            .attr("stroke", "#fff")
-            .attr("stroke-width", 1);
+            .attr("y2", height);
 
-        // Hour labels
+        // Add hour labels only (when minutes are 0)
         if (slot.timestamp.getMinutes() === 0) {
-            svg.append("text")
+            // For the first slot, check if we should show it based on position
+            if (i === 0 && x < 50) {
+                console.log("Skipping first label due to position:", x);
+                return;
+            }
+            
+            timeHeader.append("div")
                 .attr("class", "time-label")
-                .attr("x", x)
-                .attr("y", -5)
-                .attr("text-anchor", "middle")
-                .attr("fill", "#fff")
+                .style("position", "absolute")
+                .style("left", `${x}px`)
+                .style("transform", "translateX(-50%)")
+                .style("text-align", "center")
                 .text(slot.displayTime);
         }
     });
@@ -290,6 +363,39 @@ function drawConnections(svg, data, timeScale, projectPositions) {
                 .attr("fill", "none");
         });
     });
+}
+
+/**
+ * Draws the attendees list
+ * @param {Array} attendees - The attendees to display
+ */
+function drawAttendees(attendees) {
+    const attendeesContainer = d3.select(".attendees-column").html('');
+    
+    // Create attendee elements
+    const attendeeElements = attendeesContainer
+        .selectAll(".attendee")
+        .data(attendees)
+        .enter()
+        .append("div")
+        .attr("class", "attendee");
+
+    // Add attendee info section
+    const attendeeInfo = attendeeElements
+        .append("div")
+        .attr("class", "attendee-info");
+
+    // Add attendee ID
+    attendeeInfo
+        .append("div")
+        .attr("class", "attendee-id")
+        .text(d => d.displayId);
+
+    // Add credits
+    attendeeElements
+        .append("div")
+        .attr("class", "attendee-credits")
+        .text(d => `${d.credits}cr`);
 }
 
 // Update visualization (called on changes)
