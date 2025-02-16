@@ -1,0 +1,62 @@
+body {
+  background: #000;
+  margin: 0;
+  padding: 20px;
+  font-family: monospace;
+  color: #fff;
+}
+
+.control-panel {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #333;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+}
+
+.control-button {
+  background: #333;
+  border: 1px solid #555;
+  color: #fff;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.control-button:hover {
+  background: #444;
+}
+
+.control-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.connection {
+  fill: none;
+  stroke: #fff;
+  stroke-opacity: 0.2;
+}
+
+.connection:hover {
+  stroke-opacity: 0.5;
+}
+
+.timeline-point {
+  fill: #fff;
+}
+
+.project-box {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1;
+}
