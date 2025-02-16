@@ -5,7 +5,19 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="visualization"></div>
+    <div class="app-container">
+      <div class="main-content">
+        <div class="attendees-column">
+          <!-- Attendees will go here -->
+        </div>
+        <div id="visualization" class="timeline-column">
+          <!-- D3 visualization will go here -->
+        </div>
+        <div class="projects-column">
+          <!-- Projects will be rendered here by D3 -->
+        </div>
+      </div>
+    </div>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="script.js"></script>
   </body>
