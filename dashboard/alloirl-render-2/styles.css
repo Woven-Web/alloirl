@@ -4,6 +4,17 @@ body {
   padding: 20px;
   font-family: monospace;
   color: #fff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#visualization {
+  flex: 1;
+  width: 100%;
+  min-height: 500px;
+  position: relative;
+  overflow: hidden;
 }
 
 .control-panel {
@@ -14,6 +25,7 @@ body {
   border: 1px solid #333;
   padding: 10px;
   border-radius: 4px;
+  z-index: 1000;
 }
 
 .control-row {
@@ -41,14 +53,29 @@ body {
   opacity: 0.8;
 }
 
+.time-marker {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.vote-point {
+  fill: #fff;
+  r: 4;
+}
+
+.vote-point:hover {
+  r: 6;
+  transition: r 0.2s ease;
+}
+
 .connection {
-  fill: none;
-  stroke: #fff;
-  stroke-opacity: 0.2;
+  stroke-width: 1;
+  stroke: rgba(255, 255, 255, 0.2);
+  transition: stroke-opacity 0.2s ease;
 }
 
 .connection:hover {
-  stroke-opacity: 0.5;
+  stroke: rgba(255, 255, 255, 0.5);
 }
 
 .timeline-point {
@@ -59,4 +86,26 @@ body {
   fill: none;
   stroke: #fff;
   stroke-width: 1;
+  transition: all 0.2s ease;
+  opacity: 0.8;
+}
+
+.project-box:hover {
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.project text {
+  fill: #fff;
+  font-size: 12px;
+  dominant-baseline: middle;
+  text-anchor: middle;
+}
+
+.project {
+  transition: transform 0.3s ease;
+}
+
+.project:hover {
+  transform: translateX(-2px);
 }

@@ -1,38 +1,89 @@
 // Constants for configuration
 const CONFIG = {
-    margin: { top: 20, right: 200, bottom: 20, left: 50 },
+    dimensions: {
+        width: 960,
+        height: 500,
+    },
+    margin: { 
+        top: 20, 
+        right: 200, 
+        bottom: 20, 
+        left: 50 
+    },
     project: {
-        width: 150,
-        height: 60,
+        width: Math.min(200, 150),
+        height: Math.min(100, 60),
         spacing: 20,
         cornerRadius: 4
+    },
+    time: {
+        interval: 15, // minutes
+        slots: 8,     // number of time slots to show (2 hours = 8 slots)
+        format: d3.timeFormat("%I:%M %p")
     }
+};
+
+// Calculate actual drawing dimensions
+const DIMS = {
+    width: CONFIG.dimensions.width - CONFIG.margin.left - CONFIG.margin.right,
+    height: CONFIG.dimensions.height - CONFIG.margin.top - CONFIG.margin.bottom
 };
 
 // State management
 let nodesPerLine = 3;
+let numProjects = 5;
+
+// Function to generate time slots
+function generateTimeSlots() {
+    const now = new Date();
+    // Round down to nearest 15 minutes
+    now.setMinutes(Math.floor(now.getMinutes() / CONFIG.time.interval) * CONFIG.time.interval);
+    now.setSeconds(0);
+    now.setMilliseconds(0);
+
+    return Array.from({ length: CONFIG.time.slots }, (_, i) => {
+        const time = new Date(now);
+        time.setMinutes(time.getMinutes() - (CONFIG.time.interval * i));
+        return {
+            timestamp: time,
+            displayTime: CONFIG.time.format(time),
+            votes: []
+        };
+    }).reverse(); // Reverse so oldest is first
+}
 
 // Function to generate data based on nodes per line
-function generateData(npl) {
-    const votes = Array.from({ length: npl }, (_, i) => ({
-        id: i + 1,
-        time: `2024-${String(i + 1).padStart(2, '0')}`
-        // Removed metadata as it's not currently used
-    }));
-
-    const projects = ['A', 'B', 'C', 'D'].map((name, id) => ({ 
+function generateData(npl, DIMS) {
+    const timeSlots = generateTimeSlots();
+    
+    const projects = Array.from({ length: numProjects }, (_, id) => ({ 
         id: id + 1, 
-        name: `Project ${name}`, 
-        votes: [] 
+        name: `Project ${String.fromCharCode(65 + id)}`,
+        votes: []
     }));
 
-    // Simplified connection distribution
-    votes.forEach(vote => {
-        const projectIndex = Math.floor(Math.random() * projects.length);
-        projects[projectIndex].votes.push(vote.id);
+    // Generate random votes for each time slot
+    timeSlots.forEach((slot, slotIndex) => {
+        // Generate exactly npl votes for this time slot
+        for (let i = 0; i < npl; i++) {
+            const voteId = `vote_${slotIndex}_${i}`;
+            const projectIndex = Math.floor(Math.random() * projects.length);
+            
+            slot.votes.push({
+                id: voteId,
+                projectId: projects[projectIndex].id,
+                // Random vertical position within the slot
+                yPosition: Math.random() * DIMS.height
+            });
+            
+            projects[projectIndex].votes.push({
+                timeSlotIndex: slotIndex,
+                voteId: voteId
+            });
+        }
     });
 
-    return { votes, projects };
+    return { timeSlots, projects };
 }
 
 // Create control panel
@@ -41,6 +92,7 @@ function createControlPanel() {
         .append('div')
         .attr('class', 'control-panel');
     
+    // NPL controls
     const nplRow = panel.append('div')
         .attr('class', 'control-row');
     
@@ -69,129 +121,226 @@ function createControlPanel() {
             nodesPerLine++;
             updateVisualization();
         });
+
+    // Project count controls
+    const projRow = panel.append('div')
+        .attr('class', 'control-row');
+    
+    projRow.append('span')
+        .attr('class', 'control-label')
+        .text('proj: ');
+    
+    projRow.append('button')
+        .attr('class', 'control-button')
+        .text('-')
+        .on('click', () => {
+            if (numProjects > 1) {
+                numProjects--;
+                updateVisualization();
+            }
+        });
+    
+    projRow.append('span')
+        .attr('class', 'control-label')
+        .text(() => numProjects);
+    
+    projRow.append('button')
+        .attr('class', 'control-button')
+        .text('+')
+        .on('click', () => {
+            numProjects++;
+            updateVisualization();
+        });
 }
 
 // Function to update the visualization
 function updateVisualization() {
-    // Clear existing visualization
-    d3.select('#visualization').html('');
-    
-    // Update data based on nodesPerLine
-    const data = generateData(nodesPerLine);
-    
-    // Recreate visualization
-    createVisualization(data);
-    
-    // Update npl display
-    d3.select('.control-panel .control-label:nth-child(3)')
-        .text(nodesPerLine);
+    const data = generateData(nodesPerLine, DIMS);
+    createVisualization(data, CONFIG, DIMS);
 }
 
 // Main visualization function
-function createVisualization(data) {
-    // Set up dimensions
-    const margin = CONFIG.margin;
-    const width = 960 - margin.left - margin.right;
-    const height = 500 - margin.top - margin.bottom;
+function createVisualization(data, CONFIG, DIMS) {
+    // Clear previous visualization
+    d3.select("#visualization").html('');
 
     // Create SVG
     const svg = d3.select("#visualization")
         .append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
+        .attr("width", CONFIG.dimensions.width)
+        .attr("height", CONFIG.dimensions.height)
         .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+        .attr("transform", `translate(${CONFIG.margin.left},${CONFIG.margin.top})`);
 
-    // Create scales with domain based on current number of nodes
-    const timeScale = d3.scaleLinear()
-        .domain([0, nodesPerLine - 1])
-        .range([0, height]);
+    // Create time scale based on actual timestamps
+    const timeScale = d3.scaleTime()
+        .domain([
+            data.timeSlots[0].timestamp,
+            data.timeSlots[data.timeSlots.length - 1].timestamp
+        ])
+        .range([0, DIMS.width - CONFIG.margin.right]);
 
-    // Set up project boxes
-    const project = CONFIG.project;
+    // Draw timeline with actual times
+    data.timeSlots.forEach((slot, i) => {
+        const x = timeScale(slot.timestamp);
+        
+        // Draw vertical time marker
+        svg.append("line")
+            .attr("class", "time-marker")
+            .attr("x1", x)
+            .attr("x2", x)
+            .attr("y1", 0)
+            .attr("y2", DIMS.height)
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1);
 
-    // Draw timeline
-    const timeline = svg.append("line")
-        .attr("x1", 0)
-        .attr("y1", 0)
-        .attr("x2", 0)
-        .attr("y2", height)
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 1);
+        // Add time label
+        svg.append("text")
+            .attr("class", "time-label")
+            .attr("x", x)
+            .attr("y", -5)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#fff")
+            .text(slot.displayTime);
+    });
 
-    // Draw vote points with transition
-    const votePoints = svg.selectAll(".vote-point")
-        .data(data.votes)
-        .enter()
-        .append("circle")
-        .attr("class", "timeline-point")
-        .attr("cx", 0)
-        .attr("cy", (d, i) => timeScale(i))
-        .attr("r", 4);
-
-    // Draw project boxes
+    // Adjust project boxes to stretch vertically
     const projectGroup = svg.append("g")
-        .attr("transform", `translate(${width - project.width}, 0)`);
+        .attr("transform", `translate(${DIMS.width - CONFIG.project.width}, 0)`);
 
+    const totalProjectsHeight = data.projects.length * (CONFIG.project.height + CONFIG.project.spacing);
+    const startY = 0; // Start from the top
+    
     const projects = projectGroup.selectAll(".project")
         .data(data.projects)
         .enter()
         .append("g")
         .attr("class", "project")
-        .attr("transform", (d, i) => 
-            `translate(0, ${i * (project.height + project.spacing)})`);
+        .attr("transform", (d, i) => {
+            const y = startY + (i * (CONFIG.project.height + CONFIG.project.spacing));
+            return `translate(0, ${y})`;
+        });
 
     projects.append("rect")
         .attr("class", "project-box")
-        .attr("width", project.width)
-        .attr("height", project.height)
-        .attr("rx", project.cornerRadius);
+        .attr("width", CONFIG.project.width)
+        .attr("height", CONFIG.project.height)
+        .attr("rx", CONFIG.project.cornerRadius);
 
-    // Separate connection drawing logic
-    function drawConnections(svg, data, timeScale, width) {
-        svg.selectAll(".connection").remove();
-        
-        const projectConfig = CONFIG.project; // Get the project config values
-        
-        data.projects.forEach((projectData, projectIndex) => {
-            projectData.votes.forEach(voteId => {
-                const voteIndex = data.votes.findIndex(v => v.id === voteId);
-                const sourceY = timeScale(voteIndex);
-                const targetY = projectIndex * (projectConfig.height + projectConfig.spacing) + projectConfig.height/2;
-                
-                const path = d3.path();
-                path.moveTo(0, sourceY);
-                path.bezierCurveTo(
-                    width/3, sourceY,
-                    width * 2/3, targetY,
-                    width - projectConfig.width, targetY
-                );
-                
-                svg.append("path")
-                    .attr("class", "connection")
-                    .attr("d", path.toString());
-            });
+    projects.append("text")
+        .attr("x", CONFIG.project.width / 2)
+        .attr("y", CONFIG.project.height / 2)
+        .text(d => d.name);
+
+    // Draw vote points with random vertical positions
+    data.timeSlots.forEach((slot, slotIndex) => {
+        slot.votes.forEach(vote => {
+            svg.append("circle")
+                .attr("class", "vote-point")
+                .attr("cx", timeScale(slot.timestamp))
+                .attr("cy", vote.yPosition)
+                .attr("r", 4)
+                .attr("fill", "white");
+
+            // Draw connection to project
+            const project = data.projects.find(p => p.id === vote.projectId);
+            if (!project) return;
+
+            const projectIndex = data.projects.indexOf(project);
+            const sourceX = timeScale(slot.timestamp);
+            const sourceY = vote.yPosition;
+            const targetX = DIMS.width - CONFIG.project.width;
+            const targetY = startY + (projectIndex * (CONFIG.project.height + CONFIG.project.spacing)) + (CONFIG.project.height / 2);
+
+            const path = d3.path();
+            path.moveTo(sourceX, sourceY);
+            path.bezierCurveTo(
+                sourceX + (targetX - sourceX)/3, sourceY,
+                sourceX + 2*(targetX - sourceX)/3, targetY,
+                targetX, targetY
+            );
+
+            svg.append("path")
+                .attr("class", "connection")
+                .attr("d", path.toString())
+                .attr("stroke", "white")
+                .attr("fill", "none");
         });
-    }
-
-    drawConnections(svg, data, timeScale, width);
-
-    // Add drag behavior for reordering projects
-    const drag = d3.drag()
-        .on("drag", function(event, d) {
-            const currentY = d3.select(this).attr("transform");
-            const newY = event.y;
-            // Update project position
-            d3.select(this)
-                .attr("transform", `translate(0, ${newY})`);
-            // Recreate connections
-            drawConnections(svg, data, timeScale, width);
-        });
-
-    projects.call(drag);
+    });
 }
 
-// Initialize with initial data
-const data = generateData(nodesPerLine);
-createVisualization(data);
+// Get container dimensions
+function getContainerDimensions() {
+    const container = d3.select("#visualization").node();
+    if (!container) return { width: 960, height: 500 }; // fallback dimensions
+    
+    const bbox = container.getBoundingClientRect();
+    return {
+        width: bbox.width,
+        height: bbox.height
+    };
+}
+
+// Dynamic CONFIG that updates with container size
+function createConfig() {
+    const containerDims = getContainerDimensions();
+    
+    return {
+        dimensions: containerDims,
+        margin: { 
+            top: 20, 
+            right: 200, 
+            bottom: 20, 
+            left: 50 
+        },
+        project: {
+            width: Math.min(200, 150),
+            height: Math.min(100, 60),
+            spacing: 20,
+            cornerRadius: 4
+        },
+        time: {
+            interval: 15,
+            slots: 8,
+            format: d3.timeFormat("%I:%M %p")
+        }
+    };
+}
+
+// Calculate actual drawing dimensions
+function getDims(config) {
+    return {
+        width: config.dimensions.width - config.margin.left - config.margin.right,
+        height: config.dimensions.height - config.margin.top - config.margin.bottom
+    };
+}
+
+// Update visualization with new dimensions
+function updateVisualization() {
+    const CONFIG = createConfig();
+    const DIMS = getDims(CONFIG);
+    const data = generateData(nodesPerLine, DIMS);
+    createVisualization(data, CONFIG, DIMS);
+}
+
+// Simple debounce function
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// Add window resize handler with our own debounce
+window.addEventListener('resize', debounce(() => {
+    updateVisualization();
+}, 250));
+
+// Initial render
+updateVisualization();
 createControlPanel();
