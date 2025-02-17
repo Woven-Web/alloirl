@@ -93,7 +93,7 @@ export const allocateVotes = async (
   }
 
   // Insert vote
-  const { error: voteError } = await supabase.from("votes").insert({
+  const { error: voteError } = await supabase.from("transactions").insert({
     user_id: user.id,
     project_id: projectId,
     amount,
