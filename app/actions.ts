@@ -116,14 +116,14 @@ export const allocateVotes = async (
   if (updateError) {
     return encodedRedirect(
       "error",
-      `/events/${eventId}/projects/${projectId}`,
+      `/events/${eventId}/project/${projectId}`,
       "Failed to update available votes"
     );
   }
 
   return encodedRedirect(
     "success",
-    `/events/${eventId}/projects/${projectId}`,
+    `/events/${eventId}/project/${projectId}`,
     `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}`
   );
 };
