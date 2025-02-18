@@ -17,27 +17,22 @@ export const updateSession = async (request: NextRequest) => {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() {
-            return request.cookies.getAll();
+          get(name: string) {
+            return request.cookies.get(name)?.value;
           },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) =>
-              request.cookies.set(name, value),
-            );
-            response = NextResponse.next({
-              request,
-            });
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options),
-            );
+          set(name: string, value: string, options: any) {
+            // If the cookie is updated, update the response
+            response.cookies.set(name, value, options);
+          },
+          remove(name: string, options: any) {
+            response.cookies.set(name, '', options);
           },
         },
       },
     );
 
-    // This will refresh session if expired - required for Server Components
-    // https://supabase.com/docs/guides/auth/server-side/nextjs
-    const user = await supabase.auth.getUser();
+    // Refresh session if expired
+    await supabase.auth.getSession();
 
     // Handle protected routes
     const protectedPaths = ["/events", "/credits"];
@@ -45,7 +40,7 @@ export const updateSession = async (request: NextRequest) => {
       request.nextUrl.pathname.startsWith(path)
     );
 
-    if (isProtectedPath && user.error) {
+    if (isProtectedPath && !supabase.auth.getUser().data.user) {
       return NextResponse.redirect(new URL("/sign-in", request.url));
     }
 
