@@ -22,7 +22,11 @@ export const signInAction = async (formData: FormData) => {
   }
 
   const headersList = await headers();
-  const origin = headersList.get("origin");
+  const origin = headersList.get("origin") || (
+    process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : 'http://localhost:3000'
+  );
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithOtp({
