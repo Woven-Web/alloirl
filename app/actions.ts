@@ -64,11 +64,7 @@ export const allocateVotes = async (
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return encodedRedirect(
-      "error",
-      `/events/${eventId}/projects/${projectId}`,
-      "You must be signed in to vote"
-    );
+    throw new Error("You must be signed in to vote");
   }
 
   // Get current event participant
@@ -80,20 +76,12 @@ export const allocateVotes = async (
     .single();
 
   if (participantError || !eventParticipant) {
-    return encodedRedirect(
-      "error",
-      `/events/${eventId}/projects/${projectId}`,
-      "You are not a participant in this event"
-    );
+    throw new Error("You are not a participant in this event");
   }
 
   // Check if they have enough votes
   if (eventParticipant.available_votes < amount) {
-    return encodedRedirect(
-      "error",
-      `/events/${eventId}/projects/${projectId}`,
-      "You don't have enough votes"
-    );
+    throw new Error("You don't have enough votes");
   }
 
   // Insert vote
@@ -104,11 +92,7 @@ export const allocateVotes = async (
   });
 
   if (voteError) {
-    return encodedRedirect(
-      "error",
-      `/events/${eventId}/projects/${projectId}`,
-      "Failed to submit vote"
-    );
+    throw new Error("Failed to submit vote");
   }
 
   // Update available votes
@@ -118,18 +102,10 @@ export const allocateVotes = async (
     .eq("id", eventParticipant.id);
 
   if (updateError) {
-    return encodedRedirect(
-      "error",
-      `/events/${eventId}/project/${projectId}`,
-      "Failed to update available votes"
-    );
+    throw new Error("Failed to update available votes");
   }
 
-  return encodedRedirect(
-    "success",
-    `/events/${eventId}/project/${projectId}`,
-    `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}`
-  );
+  return { success: true, message: `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}` };
 };
 
 export const importGitcoinRound = async (url: string, checkOnly = false) => {

@@ -4,6 +4,7 @@ import { hasEnvVars } from "@/utils/supabase/check-env-vars";
 import { Geist } from "next/font/google";
 import Link from "next/link";
 import { AlloLogo } from "@/components/allo-logo";
+import { Toaster } from 'react-hot-toast';
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={geistSans.className} suppressHydrationWarning>
       <body className="bg-brand-yellow" suppressHydrationWarning>
+        <Toaster position="top-center" />
         <main className="min-h-screen flex flex-col">
           <nav className="w-full flex justify-between items-center p-4">
             <div className="w-full max-w-5xl mx-auto flex justify-between items-center">

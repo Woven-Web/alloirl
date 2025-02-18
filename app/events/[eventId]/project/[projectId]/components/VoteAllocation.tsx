@@ -5,6 +5,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { useState, useEffect } from "react";
 import { allocateVotes } from "@/app/actions";
 import { createClient } from "@/utils/supabase/client";
+import toast from 'react-hot-toast';
 import Link from "next/link";
 // import { useToast } from "@/components/ui/use-toast";
 
@@ -61,16 +62,15 @@ export function VoteAllocation({
   const submitAllocation = async () => {
     try {
       setIsSubmitting(true);
-      await allocateVotes(projectId, eventId, allocatingVotes);
-      if (onVoteSuccess) {
-        onVoteSuccess();
+      const result = await allocateVotes(projectId, eventId, allocatingVotes);
+      if (result.success) {
+        toast.success(result.message);
+        if (onVoteSuccess) {
+          onVoteSuccess();
+        }
       }
     } catch (error) {
-      // toast({
-      //   title: "Failed to allocate votes",
-      //   description: error instanceof Error ? error.message : "Unknown error occurred",
-      //   variant: "destructive",
-      // });
+      toast.error(error instanceof Error ? error.message : "Failed to allocate votes");
     } finally {
       setIsSubmitting(false);
     }
@@ -79,14 +79,14 @@ export function VoteAllocation({
   return (
     <div className="flex-1 flex flex-col">
       <div className="flex-1 space-y-4 overflow-auto">
-        <h2 className="text-brand-blue font-eyebrow text-4xl">Recent Allocations</h2>
+        {/* <h2 className="text-brand-blue font-eyebrow text-4xl">Recent Allocations</h2>
         <div className="space-y-2">
           {recentAllocations.map((allocation) => (
             <div key={allocation.id} className="text-brand-blue font-eyebrow text-lg">
               {allocation.time} | {allocation.user} | {allocation.votes}
             </div>
           ))}
-        </div>
+        </div> */}
       </div>
 
       <div className="mt-8 pb-8">

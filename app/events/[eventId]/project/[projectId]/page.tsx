@@ -35,15 +35,19 @@ export default async function ProjectPage({
     .single() : { data: null };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col px-4 space-y-8 overflow-hidden">
-      <ProjectDetails project={project} />
+    <div className="h-[calc(100vh-4rem)] relative">
+      <div className="overflow-y-auto h-full pb-32 px-4">
+        <ProjectDetails project={project} />
+      </div>
       
       {user && (
-        <VoteAllocation 
-          eventId={eventId}
-          projectId={projectId}
-          participantData={participantData}
-        />
+        <div className="fixed bottom-0 left-0 right-0 px-4 pb-[env(safe-area-inset-bottom)]">
+          <VoteAllocation 
+            eventId={eventId}
+            projectId={projectId}
+            participantData={participantData}
+          />
+        </div>
       )}
     </div>
   );
