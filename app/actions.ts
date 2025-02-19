@@ -8,28 +8,48 @@ import { createAdminClient } from "@/utils/supabase/serverAdmin";
 const encodedRedirect = (
   type: "success" | "error",
   path: string,
-  message: string
-) => redirect(`${path}?message=${encodeURIComponent(message)}&type=${type}`);
+  message: string,
+  additionalParams?: Record<string, string | boolean | number>,
+) => {
+  const params = new URLSearchParams({
+    message: message,
+    type: type,
+    ...(additionalParams || {}),
+  });
+  return redirect(`${path}?${params.toString()}`);
+};
 
 const recentImports = new Map<string, number>();
 const IMPORT_COOLDOWN = 5000; // 5 seconds
 
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
+  const code = formData.get("code") as string;
+
+  const supabase = await createClient();
+
+  if (code && email) {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: "email",
+    });
+    console.log(data, error);
+    return redirect("/");
+  }
 
   if (!email) {
     return encodedRedirect("error", "/sign-in", "Email is required");
   }
 
   const headersList = await headers();
-  const origin = headersList.get("origin") || (
-    process.env.VERCEL_URL 
+  const origin =
+    headersList.get("origin") ||
+    (process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'
-  );
+      : "http://localhost:3000");
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error, data } = await supabase.auth.signInWithOtp({
     email,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
@@ -43,7 +63,8 @@ export const signInAction = async (formData: FormData) => {
   return encodedRedirect(
     "success",
     "/sign-in",
-    "Check your email for the sign-in link"
+    "Check your email for your OTP code.",
+    { otpSent: 1, email },
   );
 };
 
@@ -56,7 +77,7 @@ export const signOutAction = async () => {
 export const allocateVotes = async (
   projectId: string,
   eventId: string,
-  amount: number
+  amount: number,
 ) => {
   const supabase = await createClient();
   const {
@@ -105,7 +126,10 @@ export const allocateVotes = async (
     throw new Error("Failed to update available votes");
   }
 
-  return { success: true, message: `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}` };
+  return {
+    success: true,
+    message: `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}`,
+  };
 };
 
 export const importGitcoinRound = async (url: string, checkOnly = false) => {
@@ -119,18 +143,18 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
   }
 
   const [_, chainId, roundId] = match;
-  
+
   // Check if this round was recently imported
   const importKey = `${chainId}-${roundId}`;
   const lastImport = recentImports.get(importKey);
   const now = Date.now();
-  
+
   if (lastImport && now - lastImport < IMPORT_COOLDOWN) {
     return { error: "Please wait a few seconds before trying again" };
   }
-  
+
   recentImports.set(importKey, now);
-  
+
   // Fetch round data from Gitcoin API
   const query = `
     query {
@@ -152,7 +176,7 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query }),
-      }
+      },
     );
 
     const data = await response.json();
@@ -161,29 +185,34 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
     }
 
     const round = data.data.round;
-    const metadata = typeof round.roundMetadata === "string"
-      ? JSON.parse(round.roundMetadata)
-      : round.roundMetadata;
+    const metadata =
+      typeof round.roundMetadata === "string"
+        ? JSON.parse(round.roundMetadata)
+        : round.roundMetadata;
 
     // Add logging to debug the round ID we're checking
-    console.log('Checking for existing event with gitcoin_round_id:', round.id);
+    console.log("Checking for existing event with gitcoin_round_id:", round.id);
 
     // Check if event already exists
     const { data: existingEvent, error: fetchError } = await supabase
       .from("events")
-      .select('id, gitcoin_round_id')
-      .eq('gitcoin_round_id', round.id)
+      .select("id, gitcoin_round_id")
+      .eq("gitcoin_round_id", round.id)
       .maybeSingle();
 
     // Add logging to see what we found
-    console.log('Existing event check result:', { existingEvent, fetchError });
+    console.log("Existing event check result:", { existingEvent, fetchError });
 
     if (fetchError) {
-      return { error: `Error checking for existing event: ${fetchError.message}` };
+      return {
+        error: `Error checking for existing event: ${fetchError.message}`,
+      };
     }
 
     if (existingEvent) {
-      return { error: `This round has already been imported (Event ID: ${existingEvent.id})` };
+      return {
+        error: `This round has already been imported (Event ID: ${existingEvent.id})`,
+      };
     }
 
     // Create event and projects in a single transaction
@@ -194,7 +223,7 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
         description: metadata.eligibility?.description || "",
         start_date: new Date().toISOString(),
         end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        gitcoin_round_id: round.id
+        gitcoin_round_id: round.id,
       })
       .select()
       .single();
@@ -207,34 +236,36 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
       return { error: "No applications found in round data" };
     }
 
-    const projects = round.applications.map((application: any) => {
-      const metadata =
-        typeof application.metadata === "string"
-          ? JSON.parse(application.metadata)
-          : application.metadata;
+    const projects = round.applications
+      .map((application: any) => {
+        const metadata =
+          typeof application.metadata === "string"
+            ? JSON.parse(application.metadata)
+            : application.metadata;
 
-      const projectData = metadata.application?.project;
+        const projectData = metadata.application?.project;
 
-      if (!projectData) {
-        return null;
-      }
+        if (!projectData) {
+          return null;
+        }
 
-      return {
-        event_id: event.id,
-        name: projectData.title || "Untitled Project",
-        description:
-          metadata.application?.answers?.find((a: any) => a.questionId === 4)
-            ?.answer || "",
-        metadata: {
-          gitcoin_id: application.id,
-          gitcoin_project_id: projectData.id,
-          gitcoin_chain_id: chainId,
-          gitcoin_round_id: roundId,
-          application_answers: metadata.application?.answers || [],
-          project_data: projectData,
-        },
-      };
-    }).filter((p: unknown) => p !== null);
+        return {
+          event_id: event.id,
+          name: projectData.title || "Untitled Project",
+          description:
+            metadata.application?.answers?.find((a: any) => a.questionId === 4)
+              ?.answer || "",
+          metadata: {
+            gitcoin_id: application.id,
+            gitcoin_project_id: projectData.id,
+            gitcoin_chain_id: chainId,
+            gitcoin_round_id: roundId,
+            application_answers: metadata.application?.answers || [],
+            project_data: projectData,
+          },
+        };
+      })
+      .filter((p: unknown) => p !== null);
 
     if (projects.length === 0) {
       return { error: "No valid projects found in applications" };
@@ -251,7 +282,7 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
 
     if (createError) {
       // If project creation fails, we should probably delete the event
-      await supabase.from("events").delete().eq('id', event.id);
+      await supabase.from("events").delete().eq("id", event.id);
       return { error: createError.message };
     }
 
@@ -263,29 +294,35 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
 };
 
 export const updateProfileName = async (formData: FormData) => {
-  const name = formData.get('name') as string;
+  const name = formData.get("name") as string;
 
   if (!name) {
-    return encodedRedirect('error', '/profile/edit', 'Name is required');
+    return encodedRedirect("error", "/profile/edit", "Name is required");
   }
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    return encodedRedirect('error', '/profile/edit', 'You must be signed in');
+    return encodedRedirect("error", "/profile/edit", "You must be signed in");
   }
 
   const { error } = await supabase
-    .from('profiles')
+    .from("profiles")
     .update({ name })
-    .eq('id', user.id);
+    .eq("id", user.id);
 
   if (error) {
-    return encodedRedirect('error', '/profile/edit', 'Failed to update profile');
+    return encodedRedirect(
+      "error",
+      "/profile/edit",
+      "Failed to update profile",
+    );
   }
 
-  return encodedRedirect('success', '/profile', 'Profile updated successfully');
+  return encodedRedirect("success", "/profile", "Profile updated successfully");
 };
 
 export const purchaseCredits = async (amount: number) => {
@@ -298,7 +335,7 @@ export const purchaseCredits = async (amount: number) => {
     return encodedRedirect(
       "error",
       `/credits`,
-      "You must be signed in to purchase credits"
+      "You must be signed in to purchase credits",
     );
   }
 
@@ -313,7 +350,7 @@ export const purchaseCredits = async (amount: number) => {
     return encodedRedirect(
       "error",
       `/credits`,
-      "You are not a participant in any event"
+      "You are not a participant in any event",
     );
   }
 
@@ -327,13 +364,13 @@ export const purchaseCredits = async (amount: number) => {
     return encodedRedirect(
       "error",
       `/credits`,
-      "Failed to update available votes"
+      "Failed to update available votes",
     );
   }
 
   return encodedRedirect(
     "success",
     `/credits`,
-    `Successfully purchased ${amount} credit${amount === 1 ? "" : "s"}`
+    `Successfully purchased ${amount} credit${amount === 1 ? "" : "s"}`,
   );
 };

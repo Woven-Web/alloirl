@@ -5,9 +5,10 @@ import { headers } from "next/headers";
 // Helper function to detect in-app browsers
 function isInAppBrowser(userAgent: string) {
   return (
-    userAgent.includes('iPhone') && // iOS device
-    !userAgent.includes('Safari/')  // Not main Safari
-  ) || userAgent.includes('GSA/');  // Gmail specific app
+    (userAgent.includes("iPhone") && // iOS device
+      !userAgent.includes("Safari/")) || // Not main Safari
+    userAgent.includes("GSA/")
+  ); // Gmail specific app
 }
 
 export async function GET(request: Request) {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const headersList = await headers();
-  const userAgent = headersList.get('user-agent') || '';
+  const userAgent = headersList.get("user-agent") || "";
 
   // If this is an in-app browser and we have a code, show warning
   if (code && isInAppBrowser(userAgent)) {
@@ -68,32 +69,36 @@ export async function GET(request: Request) {
       </html>`,
       {
         headers: {
-          'Content-Type': 'text/html',
+          "Content-Type": "text/html",
         },
-      }
+      },
     );
   }
 
   if (code) {
-    const supabase = await createClient()
-    
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
-    
+    const supabase = await createClient();
+
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
     if (!error) {
       // Check if user has requested name
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('profiles')
-        .select('name_requested')
-        .eq('id', user?.id)
-        .single()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("name_requested")
+        .eq("id", user?.id)
+        .single();
 
       // Redirect to name page if name not yet requested
       if (!profile?.name_requested) {
-        return NextResponse.redirect(new URL('/username', requestUrl.origin))
+        return NextResponse.redirect(new URL("/username", requestUrl.origin));
       }
     }
   }
 
   // Redirect to home page
-  return NextResponse.redirect(new URL('/', requestUrl.origin))
+  return NextResponse.redirect(new URL("/", requestUrl.origin));
 }
+
