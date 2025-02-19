@@ -266,19 +266,37 @@ function drawTimeline(svg, data, timeScale, height) {
 function drawProjects(projects) {
     const projectsContainer = d3.select(".projects-column").html('');
     
-    // Create project boxes
-    projectsContainer.selectAll(".project")
+    // Create project containers
+    const projectDivs = projectsContainer.selectAll(".project")
         .data(projects)
         .enter()
         .append("div")
         .attr("class", "project")
-        .style("margin-bottom", `${CONFIG.project.spacing}px`)
-        .append("div")
-        .attr("class", "project-box")
-        .style("height", `${CONFIG.project.height}px`)
-        .style("display", "flex")
-        .style("align-items", "center")
+        .style("margin-bottom", `${CONFIG.project.spacing}px`);
+
+    // Add header section with single-line layout
+    const headers = projectDivs.append("div")
+        .attr("class", "project-header");
+    
+    const headerLeft = headers.append("div")
+        .attr("class", "project-header-left")
+        .text(d => formatMoney(Math.floor(Math.random() * 5000)));
+    
+    const headerRight = headers.append("div")
+        .attr("class", "project-header-right")
+        .text(d => `${getOrdinal(d.id)} place`);
+
+    // Add content section (simplified)
+    const content = projectDivs.append("div")
+        .attr("class", "project-content");
+    
+    content.append("div")
+        .attr("class", "project-name")
         .text(d => d.name);
+    
+    content.append("div")
+        .attr("class", "project-path")
+        .text(d => `project.name/app/${d.name.toLowerCase()}`);
 
     // Calculate positions for connections
     return calculateProjectPositions(projects, projectsContainer);
@@ -292,7 +310,7 @@ function drawProjects(projects) {
  */
 function calculateProjectPositions(projects, container) {
     return projects.map((project, index) => {
-        const element = container.select(`.project:nth-child(${index + 1}) .project-box`).node();
+        const element = container.select(`.project:nth-child(${index + 1})`).node();
         const box = element.getBoundingClientRect();
         const visualizationBox = d3.select("#visualization").node().getBoundingClientRect();
         const projectsColumnBox = container.node().getBoundingClientRect();
@@ -395,7 +413,7 @@ function drawAttendees(attendees) {
     attendeeElements
         .append("div")
         .attr("class", "attendee-credits")
-        .text(d => `${d.credits}cr`);
+        .text(d => `$1,234`);
 }
 
 // Update visualization (called on changes)
@@ -495,3 +513,15 @@ window.addEventListener('resize', debounce(() => {
 // Initial render
 updateVisualization();
 createControlPanel();
+
+// Add ordinal formatter function
+function getOrdinal(n) {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// Add number formatter function
+function formatMoney(n) {
+    return `$${n.toLocaleString()}`;
+}

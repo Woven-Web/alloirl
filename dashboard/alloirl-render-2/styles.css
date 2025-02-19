@@ -64,7 +64,7 @@ body {
 }
 
 .header-projects {
-  width: 250px;
+  width: 320px;
   padding: 0 0;
   display: flex;
   align-items: center;
@@ -105,47 +105,93 @@ body {
   padding: 0;
   margin: 0;
   height: 100%;
-  background: #000;
+  /* background: #000; */
 }
 
 .projects-column {
-  width: 250px;
+  width: 320px;
   border-left: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 0;
+  padding: 15px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   height: 100%;
-  background: #000033;
+  /* background: #000033; */
+  overflow-y: auto;
 }
 
 .project {
-  height: 100px;  /* Fixed height */
-  position: relative;
+  border-radius: 8px;
+  border: 2px solid #F3FD8B;
+  overflow: hidden;
 }
 
-.project-box {
-  border: 1px solid #fff;
-  border-radius: 4px;
-  height: 100%;
+.project-header {
+  background: #F3FD8B;
+  padding: 12px 20px;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  opacity: 0.8;
-  transition: all 0.2s ease;
-  font-size: 18px;
-  font-weight: 300;
+  color: #0001B2;
+  line-height: 1;
 }
 
-.project-box:hover {
-  opacity: 1;
-  border-width: 2px;
+.project-header-left {
+  font-size: 38px;
+  font-weight: 500;
+}
+
+.project-header-right {
+  font-size: 22px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.project-content {
+  background: #0001B2;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .project-name {
-  color: #fff;
-  text-align: center;
-  font-size: 14px;
+  color: #F3FD8B;
+  font-size: 36px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.project-path {
+  color: #F3FD8B;
+  opacity: 0.7;
+  font-size: 16px;
+  font-family: 'DM Mono', monospace;
+}
+
+.project-interactions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.interaction-button {
+  background: #F3FD8B;
+  color: #0001B2;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 16px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.interaction-button:hover {
+  transform: scale(1.05);
 }
 
 #visualization {
