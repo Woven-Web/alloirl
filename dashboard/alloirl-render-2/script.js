@@ -6,9 +6,9 @@ const CONFIG = {
     },
     margin: { 
         top: 0,    // Remove top margin to align with attendees
-        right: 0,   
+        right: 40,   // added right margin for extra padding
         bottom: 0,
-        left: 0     
+        left: 10     // added left margin for extra padding
     },
     project: {
         width: 200,
@@ -231,10 +231,11 @@ function setupSVG() {
  * @param {number} width - The visualization width
  * @returns {d3.ScaleTime} The time scale
  */
-function createTimeScale(data, width) {
+function createTimeScale(data, fullWidth) {
+    const drawableWidth = fullWidth - CONFIG.margin.left - CONFIG.margin.right;
     return d3.scaleTime()
         .domain([data.timeSlots[0].timestamp, data.timeSlots[data.timeSlots.length - 1].timestamp])
-        .range([0, width]);
+        .range([0, drawableWidth]);
 }
 
 /**
@@ -261,16 +262,15 @@ function drawTimeline(svg, data, timeScale, height) {
 
         // Add hour labels only (when minutes are 0)
         if (slot.timestamp.getMinutes() === 0) {
-            // For the first slot, check if we should show it based on position
+            // Only skip if this is the first slot AND it's too close to the edge
             if (i === 0 && x < 50) {
                 console.log("Skipping first label due to position:", x);
                 return;
             }
-            
             timeHeader.append("div")
                 .attr("class", "time-label")
                 .style("position", "absolute")
-                .style("left", `${x}px`)
+                .style("left", `${CONFIG.margin.left + x}px`)  // offset the label by left margin
                 .style("transform", "translateX(-50%)")
                 .style("text-align", "center")
                 .text(slot.displayTime);
@@ -375,13 +375,11 @@ function getContainerDimensions() {
  * @param {Array} projectPositions - The calculated project positions
  */
 function drawConnections(svg, data, timeScale, projectPositions) {
-    // Get the total width for calculating proportions
-    const { width } = getContainerDimensions();
+    const containerDim = getContainerDimensions();
+    const drawableWidth = containerDim.width - CONFIG.margin.left - CONFIG.margin.right;
     
-    // Draw vote points and their connections
     data.timeSlots.forEach((slot, slotIndex) => {
         slot.votes.forEach(vote => {
-            // Draw the point
             svg.append("circle")
                 .attr("class", "vote-point")
                 .attr("cx", timeScale(slot.timestamp))
@@ -389,7 +387,6 @@ function drawConnections(svg, data, timeScale, projectPositions) {
                 .attr("r", 4)
                 .attr("fill", "white");
 
-            // Draw connection to project
             const project = data.projects.find(p => p.id === vote.projectId);
             if (!project) return;
 
@@ -399,26 +396,23 @@ function drawConnections(svg, data, timeScale, projectPositions) {
             const targetX = projectPosition.x;
             const targetY = projectPosition.y;
 
-            // Calculate stroke width based on x position
-            // Start with 0.75 on the left, scale up to 2 on the right
-            const strokeWidth = 0.75 + ((sourceX / width) * 1.25);
+            // Calculate stroke width based on x position using drawableWidth
+            const strokeWidth = 0.75 + ((sourceX / drawableWidth) * 1.25);
 
-            // Create bezier curve path
             const path = d3.path();
             path.moveTo(sourceX, sourceY);
             path.bezierCurveTo(
-                sourceX + (targetX - sourceX)/3, sourceY,  // First control point
-                sourceX + 2*(targetX - sourceX)/3, targetY, // Second control point
-                targetX, targetY                           // End point
+                sourceX + (targetX - sourceX)/3, sourceY,
+                sourceX + 2*(targetX - sourceX)/3, targetY,
+                targetX, targetY
             );
 
-            // Draw the connection line
             svg.append("path")
                 .attr("class", "connection")
                 .attr("d", path.toString())
                 .attr("stroke", "white")
                 .attr("fill", "none")
-                .style("stroke-width", `${strokeWidth}px`); // Set dynamic stroke width
+                .style("stroke-width", `${strokeWidth}px`);
         });
     });
 }
