@@ -81,8 +81,20 @@ export default function ProfilePage() {
         .eq('user_id', user.id);
 
       setProfile(profileData);
-      setTransactions(transactionsData || []);
-      setParticipations(participationsData || []);
+      
+      // Transform transactions data to ensure projects is a single object
+      const transformedTransactions = (transactionsData || []).map(t => ({
+        ...t,
+        projects: Array.isArray(t.projects) ? t.projects[0] : t.projects
+      })) as Transaction[];
+      setTransactions(transformedTransactions);
+
+      // Transform participations data to ensure events is a single object
+      const transformedParticipations = (participationsData || []).map(p => ({
+        ...p,
+        events: Array.isArray(p.events) ? p.events[0] : p.events
+      })) as EventParticipation[];
+      setParticipations(transformedParticipations);
       setLoading(false);
     };
 

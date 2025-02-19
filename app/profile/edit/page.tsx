@@ -4,17 +4,30 @@ import { createClient } from "@/utils/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { updateProfileName } from "@/app/actions";
 import { useSearchParams } from "next/navigation";
 
-export default function EditProfilePage() {
-  const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<{ name: string | null } | null>(null);
-  const [loading, setLoading] = useState(true);
+function StatusMessage() {
   const searchParams = useSearchParams();
   const message = searchParams.get('message');
   const messageType = searchParams.get('type');
+
+  if (!message) return null;
+
+  return (
+    <div className={`p-4 rounded-lg ${
+      messageType === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+    }`}>
+      {message}
+    </div>
+  );
+}
+
+function ProfileForm() {
+  const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<{ name: string | null } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchProfileData = async () => {
@@ -49,50 +62,50 @@ export default function EditProfilePage() {
   }
 
   return (
-    <div className="p-4 max-w-xl mx-auto space-y-8">
-      <h1 className="text-3xl font-bold text-brand-blue">Edit Profile</h1>
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="email" className="text-brand-blue">Email</Label>
+        <Input
+          id="email"
+          type="email"
+          value={user.email}
+          disabled
+          className="bg-gray-50"
+        />
+      </div>
 
-      {message && (
-        <div className={`p-4 rounded-lg ${
-          messageType === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-        }`}>
-          {message}
-        </div>
-      )}
-
-      <div className="space-y-6">
+      <form action={updateProfileName} className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-brand-blue">Email</Label>
+          <Label htmlFor="name" className="text-brand-blue">Name</Label>
           <Input
-            id="email"
-            type="email"
-            value={user.email}
-            disabled
-            className="bg-gray-50"
+            id="name"
+            name="name"
+            type="text"
+            defaultValue={profile?.name || ''}
+            required
+            className="border-brand-blue"
           />
         </div>
 
-        <form action={updateProfileName} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="name" className="text-brand-blue">Name</Label>
-            <Input
-              id="name"
-              name="name"
-              type="text"
-              defaultValue={profile?.name || ''}
-              required
-              className="border-brand-blue"
-            />
-          </div>
+        <Button
+          type="submit"
+          className="w-full bg-brand-blue text-white hover:bg-brand-blue/90"
+        >
+          Save Changes
+        </Button>
+      </form>
+    </div>
+  );
+}
 
-          <Button
-            type="submit"
-            className="w-full bg-brand-blue text-white hover:bg-brand-blue/90"
-          >
-            Save Changes
-          </Button>
-        </form>
-      </div>
+export default function EditProfilePage() {
+  return (
+    <div className="p-4 max-w-xl mx-auto space-y-8">
+      <h1 className="text-3xl font-bold text-brand-blue">Edit Profile</h1>
+      <Suspense>
+        <StatusMessage />
+      </Suspense>
+      <ProfileForm />
     </div>
   );
 }
