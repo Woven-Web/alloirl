@@ -74,7 +74,15 @@ function ProfileForm() {
         />
       </div>
 
-      <form action={updateProfileName} className="space-y-6">
+      <form 
+        action={async (formData: FormData) => {
+          const result = await updateProfileName(formData);
+          if ('refresh' in result) {
+            window.location.href = result.url;
+          }
+        }} 
+        className="space-y-6"
+      >
         <div className="space-y-2">
           <Label htmlFor="name" className="text-brand-blue">Name</Label>
           <Input

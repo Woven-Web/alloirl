@@ -8,6 +8,11 @@ import { AlloLogo } from "@/components/allo-logo";
 import { useSearchParams } from "next/navigation";
 import { startTransition, useEffect, useState } from "react";
 
+interface SignInResponse {
+  refresh?: boolean;
+  url?: string;
+}
+
 export interface LoginSearchParams {
   otpSent?: number;
   email?: string;
@@ -37,15 +42,17 @@ export default function Login() {
         <AlloLogo width={218} height={175} />
       </div>
       <form
-        action={signInAction}
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           const formData = new FormData();
           formData.append("email", email);
           if (code) {
             formData.append("code", code);
           }
-          startTransition(() => signInAction(formData));
+          const result = await signInAction(formData) as SignInResponse;
+          if (result?.refresh) {
+            window.location.href = result.url || '/';
+          }
         }}
         className="w-full space-y-5"
       >

@@ -39,7 +39,7 @@ export const signInAction = async (formData: FormData) => {
       return encodedRedirect("error", "/sign-in", error.message, { email });
     }
 
-    return redirect("/");
+    return { refresh: true, url: '/' };
   }
 
   if (!email) {
@@ -329,7 +329,7 @@ export const updateProfileName = async (formData: FormData) => {
     );
   }
 
-  return encodedRedirect("success", "/profile", "Profile updated successfully");
+  return { refresh: true, url: '/profile' };
 };
 
 export const purchaseCredits = async (amount: number) => {
@@ -380,4 +380,44 @@ export const purchaseCredits = async (amount: number) => {
     `/credits`,
     `Successfully purchased ${amount} credit${amount === 1 ? "" : "s"}`,
   );
+};
+
+export const updateUsername = async (formData: FormData) => {
+  const name = formData.get("name") as string;
+
+  if (!name) {
+    return { error: "Name is required" };
+  }
+
+  if (name.length < 2) {
+    return { error: "Name must be at least 2 characters long" };
+  }
+
+  if (!/^[a-zA-Z0-9\s_-]+$/.test(name)) {
+    return { error: "Name can only contain letters, numbers, spaces, underscores and dashes" };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "You must be signed in" };
+  }
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ name: name.trim() })
+    .eq("id", user.id);
+
+  if (updateError) {
+    // Check for unique constraint violation
+    if (updateError.code === '23505') {
+      return { error: `The name "${name}" is already taken. Please choose another.` };
+    }
+    return { error: updateError.message };
+  }
+
+  return { refresh: true, url: '/?message=Name set successfully!&type=success' };
 };
