@@ -29,11 +29,16 @@ export const signInAction = async (formData: FormData) => {
   const supabase = await createClient();
 
   if (code && email) {
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       email,
       token: code,
       type: "email",
     });
+
+    if (error) {
+      return encodedRedirect("error", "/sign-in", error.message, { email });
+    }
+
     return redirect("/");
   }
 
