@@ -34,7 +34,6 @@ export const signInAction = async (formData: FormData) => {
       token: code,
       type: "email",
     });
-    console.log(data, error);
     return redirect("/");
   }
 
@@ -49,7 +48,7 @@ export const signInAction = async (formData: FormData) => {
       ? `https://${process.env.VERCEL_URL}`
       : "http://localhost:3000");
 
-  const { error, data } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
       emailRedirectTo: `${origin}/auth/callback`,
