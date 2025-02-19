@@ -343,6 +343,9 @@ function getContainerDimensions() {
  * @param {Array} projectPositions - The calculated project positions
  */
 function drawConnections(svg, data, timeScale, projectPositions) {
+    // Get the total width for calculating proportions
+    const { width } = getContainerDimensions();
+    
     // Draw vote points and their connections
     data.timeSlots.forEach((slot, slotIndex) => {
         slot.votes.forEach(vote => {
@@ -364,6 +367,10 @@ function drawConnections(svg, data, timeScale, projectPositions) {
             const targetX = projectPosition.x;
             const targetY = projectPosition.y;
 
+            // Calculate stroke width based on x position
+            // Start with 0.75 on the left, scale up to 2 on the right
+            const strokeWidth = 0.75 + ((sourceX / width) * 1.25);
+
             // Create bezier curve path
             const path = d3.path();
             path.moveTo(sourceX, sourceY);
@@ -378,7 +385,8 @@ function drawConnections(svg, data, timeScale, projectPositions) {
                 .attr("class", "connection")
                 .attr("d", path.toString())
                 .attr("stroke", "white")
-                .attr("fill", "none");
+                .attr("fill", "none")
+                .style("stroke-width", `${strokeWidth}px`); // Set dynamic stroke width
         });
     });
 }

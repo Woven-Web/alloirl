@@ -3,7 +3,7 @@ body, button, input {
 }
 
 body {
-  background: #000;
+  background: #0001B2;
   margin: 0;
   padding: 0;
   color: #fff;
@@ -16,7 +16,6 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #000033;
   padding: 0;
   margin: 0;
 }
@@ -28,7 +27,6 @@ body {
   font-size: 18px;
   font-weight: 300;
   color: #FFFF00;
-  background: #000033;
   align-items: center;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -57,7 +55,6 @@ body {
   align-items: center;
   padding: 0;
   margin: 0;
-  background: #000033;
   position: relative;
   overflow: visible;
   min-height: 60px;
@@ -70,7 +67,6 @@ body {
   align-items: center;
   height: 60px;
   line-height: 60px;
-  background: #000033;
 }
 
 .header-attendee, .header-timeline, .header-projects {
@@ -88,12 +84,11 @@ body {
 
 .attendees-column {
   width: 300px;
-  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  /* border-right: 1px solid rgba(255, 255, 255, 0.1); */
   padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  background: #000033;
   overflow-y: auto;
   height: 100%;
 }
@@ -110,7 +105,7 @@ body {
 
 .projects-column {
   width: 320px;
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  /* border-left: 1px solid rgba(255, 255, 255, 0.1); */
   padding: 15px;
   display: flex;
   flex-direction: column;
@@ -127,12 +122,12 @@ body {
 }
 
 .project-header {
+  color: #0001B2;
   background: #F3FD8B;
   padding: 12px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #0001B2;
   line-height: 1;
 }
 
@@ -148,7 +143,6 @@ body {
 }
 
 .project-content {
-  background: #0001B2;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -236,13 +230,13 @@ body {
 }
 
 .time-marker {
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 1;
+  /* stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1; */
 }
 
 .vote-point {
   fill: #FFFF00;
-  r: 2.5;
+  r: 4;
   transition: r 0.2s ease;
 }
 
@@ -252,14 +246,14 @@ body {
 }
 
 .connection {
-  stroke: rgba(255, 255, 0, 0.15);
-  stroke-width: 0.75;
+  stroke: #FFFF00;
+  stroke-width: 1.5;
   transition: all 0.2s ease;
 }
 
 .connection:hover {
-  stroke: rgba(255, 255, 0, 0.4);
-  stroke-width: 1.5;
+  stroke: #FFFF00;
+  stroke-width: 2;
 }
 
 .timeline-point {
@@ -325,8 +319,9 @@ body {
 }
 
 .grid-line {
-  stroke: rgba(255, 255, 255, 0.15);
+  stroke: #333333;
   stroke-dasharray: 2 2;
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 
@@ -342,5 +337,4 @@ body {
   height: 60px;
   line-height: 60px;
   padding: 0 4px;
-  background: rgba(0, 0, 51, 0.5);
 }
