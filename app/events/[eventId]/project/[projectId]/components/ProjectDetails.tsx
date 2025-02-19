@@ -23,35 +23,13 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
   const [allocations, setAllocations] = useState<Allocation[]>([]);
 
   useEffect(() => {
-    // Initial fetch
     fetchVotes();
     fetchAllocations();
-
-    // Set up real-time subscription
-    const client = createClient();
-    const channel = client
-      .channel('project_details')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'project_allocations',
-        filter: `project_id=eq.${project.id}` 
-      }, () => {
-        fetchVotes();
-        fetchAllocations();
-      })
-      .subscribe();
-      console.log('subscribed to project allocations');
-
-    return () => {
-      channel.unsubscribe();
-    };
   }, [project.id]);
 
   async function fetchAllocations() {
     const client = createClient();
     
-    // First fetch allocations
     const { data: allocationsData } = await client
       .from("project_allocations")
       .select(`
@@ -61,13 +39,12 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         user_id
       `)
       .eq("project_id", project.id)
-      .gt("votes", 0)  // Only get allocations with votes > 0
+      .gt("votes", 0)
       .order('created_at', { ascending: false })
       .limit(10);
 
     if (!allocationsData) return;
 
-    // Then fetch profiles for those allocations
     const userIds = allocationsData.map(a => a.user_id);
     const { data: profilesData } = await client
       .from("profiles")
@@ -76,10 +53,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
 
     if (!profilesData) return;
 
-    // Create a map of user_id to profile for easier lookup
     const profileMap = new Map(profilesData.map(p => [p.id, p]));
-
-    // Join the data
     const formattedData = allocationsData.map(item => ({
       ...item,
       profiles: profileMap.has(item.user_id) ? [{ name: profileMap.get(item.user_id)!.name }] : null
@@ -115,24 +89,17 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
       <div className="space-y-4">
         <h2 className="text-brand-blue font-eyebrow text-2xl">Recent Allocations</h2>
         <div className="space-y-2">
-          {allocations.map((allocation) => (
-            <div 
-              key={allocation.id} 
-              className="flex justify-between items-center p-4 bg-white rounded-lg shadow-sm"
-            >
-              <div className="space-y-1">
-                <div className="text-brand-blue font-medium">
-                  {allocation.profiles?.[0]?.name}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {new Date(allocation.created_at).toLocaleString()}
-                </div>
+          {allocations.map((allocation) => {
+            const timeAgo = getTimeAgo(new Date(allocation.created_at));
+            return (
+              <div 
+                key={allocation.id} 
+                className="text-brand-blue font-eyebrow text-lg"
+              >
+                {timeAgo} | {allocation.profiles?.[0]?.name} | {allocation.votes}
               </div>
-              <div className="text-brand-blue font-semibold">
-                {allocation.votes} votes
-              </div>
-            </div>
-          ))}
+            );
+          })}
           {allocations.length === 0 && (
             <p className="text-gray-500 text-center py-4">No allocations yet</p>
           )}
@@ -140,4 +107,21 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
       </div>
     </div>
   );
+}
+
+function getTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+  
+  if (diffInMinutes < 1) return 'just now';
+  if (diffInMinutes === 1) return '1 min';
+  if (diffInMinutes < 60) return `${diffInMinutes} mins`;
+  
+  const hours = Math.floor(diffInMinutes / 60);
+  if (hours === 1) return '1 hour';
+  if (hours < 24) return `${hours} hours`;
+  
+  const days = Math.floor(hours / 24);
+  if (days === 1) return '1 day';
+  return `${days} days`;
 }

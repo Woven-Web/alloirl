@@ -141,9 +141,7 @@ export function VoteAllocation({
       const result = await allocateVotes(projectId, eventId, allocatingVotes);
       if (result.success) {
         toast.success(result.message);
-        if (onVoteSuccess) {
-          onVoteSuccess();
-        }
+        window.location.reload();
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to allocate votes");

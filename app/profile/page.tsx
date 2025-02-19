@@ -10,9 +10,9 @@ interface Profile {
   name: string;
 }
 
-interface Transaction {
+interface Allocation {
   id: string;
-  amount: number;
+  votes: number;
   created_at: string;
   projects: {
     id: string;
@@ -31,7 +31,7 @@ interface EventParticipation {
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [participations, setParticipations] = useState<EventParticipation[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,12 +51,12 @@ export default function ProfilePage() {
         .eq('id', user.id)
         .single();
 
-      // Fetch recent transactions
-      const { data: transactionsData } = await supabase
-        .from('transactions')
+      // Fetch recent allocations
+      const { data: allocationsData } = await supabase
+        .from('project_allocations')
         .select(`
           id,
-          amount,
+          votes,
           created_at,
           projects (
             id,
@@ -64,6 +64,7 @@ export default function ProfilePage() {
           )
         `)
         .eq('user_id', user.id)
+        .gt('votes', 0)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -82,12 +83,12 @@ export default function ProfilePage() {
 
       setProfile(profileData);
       
-      // Transform transactions data to ensure projects is a single object
-      const transformedTransactions = (transactionsData || []).map(t => ({
-        ...t,
-        projects: Array.isArray(t.projects) ? t.projects[0] : t.projects
-      })) as Transaction[];
-      setTransactions(transformedTransactions);
+      // Transform allocations data to ensure projects is a single object
+      const transformedAllocations = (allocationsData || []).map(a => ({
+        ...a,
+        projects: Array.isArray(a.projects) ? a.projects[0] : a.projects
+      })) as Allocation[];
+      setAllocations(transformedAllocations);
 
       // Transform participations data to ensure events is a single object
       const transformedParticipations = (participationsData || []).map(p => ({
@@ -119,32 +120,23 @@ export default function ProfilePage() {
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold text-brand-blue">Recent Allocations</h2>
-        {transactions.length > 0 ? (
-          <div className="space-y-2">
-            {transactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="p-4 border rounded-lg bg-white shadow-sm"
+        <h2 className="text-brand-blue font-eyebrow text-2xl">Recent Allocations</h2>
+        <div className="space-y-2">
+          {allocations.map((allocation) => {
+            const timeAgo = getTimeAgo(new Date(allocation.created_at));
+            return (
+              <div 
+                key={allocation.id} 
+                className="text-brand-blue font-eyebrow text-lg"
               >
-                <div className="flex justify-between items-center">
-                  <Link 
-                    href={`/projects/${transaction.projects.id}`}
-                    className="font-medium hover:text-brand-blue"
-                  >
-                    {transaction.projects.name}
-                  </Link>
-                  <span className="font-semibold">{transaction.amount} votes</span>
-                </div>
-                <div className="text-sm text-gray-500">
-                  {new Date(transaction.created_at).toLocaleDateString()}
-                </div>
+                {timeAgo} | {allocation.projects.name} | {allocation.votes}
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-gray-500">No recent allocations</p>
-        )}
+            );
+          })}
+          {allocations.length === 0 && (
+            <p className="text-gray-500 text-center py-4">No recent allocations</p>
+          )}
+        </div>
       </section>
 
       <section className="space-y-4">
@@ -170,4 +162,21 @@ export default function ProfilePage() {
       </section>
     </div>
   );
+}
+
+function getTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+  
+  if (diffInMinutes < 1) return 'just now';
+  if (diffInMinutes === 1) return '1 min';
+  if (diffInMinutes < 60) return `${diffInMinutes} mins`;
+  
+  const hours = Math.floor(diffInMinutes / 60);
+  if (hours === 1) return '1 hour';
+  if (hours < 24) return `${hours} hours`;
+  
+  const days = Math.floor(hours / 24);
+  if (days === 1) return '1 day';
+  return `${days} days`;
 }
