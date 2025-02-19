@@ -23,10 +23,10 @@ body {
 .header-row {
   display: flex;
   height: 60px;
-  border-bottom: 2px solid #FFFF00;
+  border-bottom: 2px solid #F3FD8B;
   font-size: 18px;
   font-weight: 300;
-  color: #FFFF00;
+  color: #F3FD8B;
   align-items: center;
   text-transform: uppercase;
   letter-spacing: 1px;
@@ -107,6 +107,7 @@ body {
   width: 320px;
   /* border-left: 1px solid rgba(255, 255, 255, 0.1); */
   padding: 15px;
+  padding-left: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -234,25 +235,19 @@ body {
   stroke-width: 1; */
 }
 
-.vote-point {
-  fill: #FFFF00;
-  r: 4;
-  transition: r 0.2s ease;
-}
-
 .vote-point:hover {
   r: 3.5;
   fill: #FFFFFF;
 }
 
 .connection {
-  stroke: #FFFF00;
+  stroke: #F3FD8B;
   stroke-width: 1.5;
   transition: all 0.2s ease;
 }
 
 .connection:hover {
-  stroke: #FFFF00;
+  stroke: #F3FD8B;
   stroke-width: 2;
 }
 
@@ -289,14 +284,14 @@ body {
 }
 
 .attendee-id {
-  color: #FFFF00;
+  color: #F3FD8B;
   font-size: 18px;
   font-weight: 300;
   min-width: 120px;
 }
 
 .attendee-credits {
-  color: #FFFF00;
+  color: #F3FD8B;
   font-size: 18px;
   font-weight: 300;
   text-align: right;
@@ -305,28 +300,28 @@ body {
 .credit-indicator {
   width: 16px;
   height: 16px;
-  border: 2px solid #FFFF00;
+  border: 2px solid #F3FD8B;
   border-radius: 50%;
   margin-left: 8px;
 }
 
 .credit-indicator.full {
-  background: #FFFF00;
+  background: #F3FD8B;
 }
 
 .credit-indicator.half {
-  background: linear-gradient(90deg, #FFFF00 50%, transparent 50%);
+  background: linear-gradient(90deg, #F3FD8B 50%, transparent 50%);
 }
 
-.grid-line {
+/* .grid-line {
   stroke: #333333;
   stroke-dasharray: 2 2;
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
-}
+} */
 
 .time-label {
-  color: #FFFF00;
+  color: #F3FD8B;
   font-size: 18px;
   font-weight: 300;
   text-transform: uppercase;
@@ -337,4 +332,34 @@ body {
   height: 60px;
   line-height: 60px;
   padding: 0 4px;
+}
+
+.vote-point {
+  fill: #F3FD8B;
+  r: 6;
+  transition: r 0.2s ease;
+}
+
+
+/* Intersection dot styles */
+.intersection-dot {
+  /* Common styling for intersection dots */
+  transition: r 0.2s ease;
+  /* stroke-width: 8px; */
+  r: 4;
+}
+
+.intersection-dot.past {
+  fill: #F3FD8B;  /* Filled yellow (adjust as needed) */
+  stroke-width: 1px;
+  /* stroke: #0001B2; */
+  r: 2;
+}
+
+.intersection-dot.future {
+  fill: none;
+  stroke: white;   /* Gray outline for future intersections */
+  opacity: 0.6;
+  stroke-width: 0.5px;
+  r: 2;
 }

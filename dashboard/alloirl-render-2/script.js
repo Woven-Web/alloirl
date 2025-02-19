@@ -23,7 +23,7 @@ const CONFIG = {
     },
     time: {
         interval: 15,     // minutes between time slots
-        slots: 24,        // 6 hours = 24 15-minute slots
+        eventDuration: 6, // duration in hours
         format: (time) => {
             // Custom format to show "10 PM", "11 PM", etc.
             const hours = time.getHours();
@@ -53,27 +53,48 @@ const DIMS = {
 let nodesPerLine = 3;  // Number of data points per time slot
 let numProjects = 5;   // Number of projects to display
 
+// Calculate event timing parameters
+function getEventTiming() {
+    const now = new Date();
+    now.setMinutes(Math.floor(now.getMinutes() / CONFIG.time.interval) * CONFIG.time.interval);
+    now.setSeconds(0);
+    now.setMilliseconds(0);
+
+    // For testing: Set event start to 2 hours before now
+    const eventStart = new Date(now);
+    eventStart.setHours(now.getHours() - 2);
+    
+    // Event end is 6 hours after event start
+    const eventEnd = new Date(eventStart);
+    eventEnd.setHours(eventStart.getHours() + CONFIG.time.eventDuration);
+
+    return {
+        eventStart,
+        eventEnd,
+        currentTime: now
+    };
+}
+
 /**
  * Generates time slots for the visualization
  * @returns {Array<TimeSlot>} Array of time slots, each with timestamp and votes
  */
 function generateTimeSlots() {
-    const now = new Date();
-    // Round down to nearest interval
-    now.setMinutes(Math.floor(now.getMinutes() / CONFIG.time.interval) * CONFIG.time.interval);
-    now.setSeconds(0);
-    now.setMilliseconds(0);
-
-    return Array.from({ length: CONFIG.time.slots }, (_, i) => {
-        const time = new Date(now);
-        // Remove the +1 so we start at the current time
-        time.setMinutes(time.getMinutes() - (CONFIG.time.interval * i));
+    const { eventStart, eventEnd, currentTime } = getEventTiming();
+    const totalSlots = (CONFIG.time.eventDuration * 60) / CONFIG.time.interval;
+    
+    return Array.from({ length: totalSlots }, (_, i) => {
+        const time = new Date(eventStart);
+        time.setMinutes(time.getMinutes() + (CONFIG.time.interval * i));
+        
         return {
             timestamp: time,
             displayTime: CONFIG.time.format(time),
-            votes: []
+            votes: [],
+            // Flag to indicate if this time slot is in the past (relative to now)
+            isPast: time <= currentTime
         };
-    }).reverse(); // Reverse so oldest is first
+    });
 }
 
 /**
@@ -107,6 +128,9 @@ function generateData(npl, dims) {
     // Generate votes for each attendee in each time slot
     attendees.forEach((attendee) => {
         timeSlots.forEach((slot, slotIndex) => {
+            // Only generate votes for time slots that are in the past
+            if (!slot.isPast) return;
+            
             // 20% chance of voting in this time slot (reduced from 30%)
             if (Math.random() > 0.2) return;
             
@@ -163,6 +187,7 @@ function createVisualization(data, config, dims) {
     drawTimeline(svg, data, timeScale, height);
     drawAttendees(data.attendees);
     drawAttendeeGridLines(svg, data.attendees, height);
+    drawIntersections(svg, data, timeScale);
     const projectPositions = drawProjects(data.projects);
     drawConnections(svg, data, timeScale, projectPositions);
 }
@@ -207,13 +232,8 @@ function setupSVG() {
  * @returns {d3.ScaleTime} The time scale
  */
 function createTimeScale(data, width) {
-    const now = new Date();
-    now.setMinutes(Math.floor(now.getMinutes() / CONFIG.time.interval) * CONFIG.time.interval);
-    now.setSeconds(0);
-    now.setMilliseconds(0);
-
     return d3.scaleTime()
-        .domain([data.timeSlots[0].timestamp, now])
+        .domain([data.timeSlots[0].timestamp, data.timeSlots[data.timeSlots.length - 1].timestamp])
         .range([0, width]);
 }
 
@@ -256,6 +276,18 @@ function drawTimeline(svg, data, timeScale, height) {
                 .text(slot.displayTime);
         }
     });
+    
+    // Add a red current time indicator line
+    const { currentTime } = getEventTiming();
+    const currentX = timeScale(currentTime);
+    svg.append("line")
+        .attr("class", "current-time-indicator")
+        .attr("x1", currentX)
+        .attr("x2", currentX)
+        .attr("y1", 0)
+        .attr("y2", height)
+        .attr("stroke", "red")
+        .attr("stroke-width", "2px");
 }
 
 /**
@@ -421,13 +453,21 @@ function drawAttendees(attendees) {
     attendeeElements
         .append("div")
         .attr("class", "attendee-credits")
-        .text(d => `$1,234`);
+        .text(d => `${d.credits}cr`);
+}
+
+/* Updated function to update event timing info in the control panel debug row */
+function updateEventHeader() {
+    const { eventStart, eventEnd, currentTime } = getEventTiming();
+    d3.select('.control-panel .event-timing')
+        .html(`Event: ${CONFIG.time.format(eventStart)} - ${CONFIG.time.format(eventEnd)} | Now: ${CONFIG.time.format(currentTime)}`);
 }
 
 // Update visualization (called on changes)
 function updateVisualization() {
     const data = generateData(nodesPerLine, DIMS);
     createVisualization(data, CONFIG, DIMS);
+    updateEventHeader();
 }
 
 // Initialize
@@ -498,6 +538,11 @@ function createControlPanel() {
             numProjects++;
             updateVisualization();
         });
+
+    // Debug row for event timing info, placed at the bottom left
+    panel.append('div')
+        .attr('class', 'control-row event-timing')
+        .style('margin-top', '10px');
 }
 
 // Simple debounce function
@@ -532,4 +577,30 @@ function getOrdinal(n) {
 // Add number formatter function
 function formatMoney(n) {
     return `$${n.toLocaleString()}`;
+}
+
+/* New function to draw intersection dots for each attendee and each time slot where no vote exists */
+function drawIntersections(svg, data, timeScale) {
+    let intersections = [];
+    data.attendees.forEach(attendee => {
+        data.timeSlots.forEach((slot, slotIndex) => {
+            // Check if a vote from this attendee exists in this slot
+            const hasVote = slot.votes.some(vote => vote.attendeeId === attendee.id);
+            if (!hasVote) {
+                intersections.push({
+                    x: timeScale(slot.timestamp),
+                    y: (attendee.lane * CONFIG.grid.rowHeight) + (CONFIG.grid.rowHeight / 2),
+                    isPast: slot.isPast
+                });
+            }
+        });
+    });
+    
+    svg.selectAll('.intersection-dot')
+        .data(intersections)
+        .enter()
+        .append('circle')
+        .attr('class', d => `intersection-dot ${d.isPast ? 'past' : 'future'}`)
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y)
 }
