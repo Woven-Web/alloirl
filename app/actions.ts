@@ -39,6 +39,20 @@ export const signInAction = async (formData: FormData) => {
       return encodedRedirect("error", "/sign-in", error.message, { email });
     }
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("name")
+      .eq("id", user?.id)
+      .single();
+
+    if (!profile?.name) {
+      return { refresh: true, url: '/username' };
+    }
+
     return { refresh: true, url: '/' };
   }
 
