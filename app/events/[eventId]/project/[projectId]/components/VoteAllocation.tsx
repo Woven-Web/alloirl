@@ -17,6 +17,7 @@ interface EventParticipant {
   events?: {
     id: string;
     name: string;
+    vote_limit: number;
   };
 }
 
@@ -24,6 +25,8 @@ interface VoteAllocationProps {
   eventId: string;
   projectId: string;
   participantData: EventParticipant | null;
+  currentAllocation: number;
+  totalVotes: number;
   onVoteSuccess?: () => void;
 }
 
@@ -31,33 +34,106 @@ export function VoteAllocation({
   eventId,
   projectId,
   participantData,
+  currentAllocation,
+  totalVotes,
   onVoteSuccess,
 }: VoteAllocationProps) {
-  const [allocatingVotes, setAllocatingVotes] = useState(
-    participantData?.available_votes ? Math.round(participantData.available_votes / 2) : 1
-  );
+  const [allocatingVotes, setAllocatingVotes] = useState(currentAllocation || 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localParticipantData, setLocalParticipantData] = useState(participantData);
-  const [recentAllocations, setRecentAllocations] = useState<any[]>([]);
+  const [localCurrentAllocation, setLocalCurrentAllocation] = useState(currentAllocation);
   const supabase = createClient();
 
+  // Update local state when props change
   useEffect(() => {
-    const channel = supabase
+    setLocalParticipantData(participantData);
+  }, [participantData]);
+
+  useEffect(() => {
+    setLocalCurrentAllocation(currentAllocation);
+    setAllocatingVotes(currentAllocation);
+  }, [currentAllocation]);
+
+  useEffect(() => {
+    // Listen for participant changes
+    const participantChannel = supabase
       .channel('participants_vote_allocation')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'event_participants',
         filter: `id=eq.${participantData?.id}` 
-      }, (payload) => {
-        setLocalParticipantData(payload.new as EventParticipant);
+      }, async (payload) => {
+        // Fetch full participant data including events
+        const { data: fullParticipant } = await supabase
+          .from('event_participants')
+          .select(`
+            *,
+            events (
+              id,
+              name,
+              vote_limit
+            )
+          `)
+          // @ts-ignore
+          .eq('id', payload.new.id)
+          .single();
+        
+        console.log('Participant update:', { 
+          fullParticipant,
+          voteLimit: fullParticipant?.events?.vote_limit
+        });
+        
+        setLocalParticipantData(fullParticipant);
+      })
+      .subscribe();
+
+    // Listen for allocation changes
+    const allocationChannel = supabase
+      .channel('project_allocations')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'project_allocations',
+        filter: `project_id=eq.${projectId} and user_id=eq.${participantData?.user_id}`,
+      }, async (payload) => {
+        console.log('Allocation update:', {
+          newAllocation: payload.new,
+          currentVoteLimit: localParticipantData?.events?.vote_limit
+        });
+        
+        // Use the payload data directly instead of making another request
+        if (payload.new) {
+          const newVotes = (payload.new as any).votes || 0;
+          setLocalCurrentAllocation(newVotes);
+          setAllocatingVotes(newVotes);
+        } else {
+          // If the record was deleted, set to 0
+          setLocalCurrentAllocation(0);
+          setAllocatingVotes(0);
+        }
       })
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(participantChannel);
+      supabase.removeChannel(allocationChannel);
     };
-  }, [participantData?.id]);
+  }, [participantData?.id, projectId, participantData?.user_id]);
+
+  // Get available votes and vote limit
+  const availableVotes = localParticipantData?.available_votes || 0;
+  const voteLimit = localParticipantData?.events?.vote_limit || 60; // Default to 60 if not set
+
+  // Debug current state
+  useEffect(() => {
+    console.log('State update:', {
+      availableVotes,
+      voteLimit,
+      localCurrentAllocation,
+      participantData: localParticipantData
+    });
+  }, [availableVotes, voteLimit, localCurrentAllocation, localParticipantData]);
 
   const submitAllocation = async () => {
     try {
@@ -92,23 +168,34 @@ export function VoteAllocation({
       <div className="mt-8 pb-8">
         <div className="flex justify-between items-center mb-4">
           <span className="text-brand-blue font-eyebrow text-lg">allocate</span>
-          <span className="text-brand-blue font-eyebrow text-sm">{localParticipantData?.available_votes ?? 0} available</span>
+          <div className="flex flex-col items-end">
+            <span className="text-brand-blue font-eyebrow text-sm">
+              {availableVotes} available
+            </span>
+            <span className="text-brand-blue/60 font-eyebrow text-xs">
+              {localCurrentAllocation} currently allocated
+            </span>
+          </div>
         </div>
         <div className="flex gap-4">
-          <NumberInput
-            min={0}
-            max={localParticipantData?.available_votes ?? 0}
-            onChange={(e) => {
-              const value = e.target.value === '' ? 0 : parseInt(e.target.value);
-              if (!isNaN(value) && value >= 0) {
+          <div className="flex-1 flex items-center gap-2">
+            <NumberInput
+              min={0}
+              max={availableVotes + localCurrentAllocation}
+              onChange={(e) => {
+                const value = e.target.value === '' ? 0 : parseInt(e.target.value);
                 setAllocatingVotes(value);
-              }
-            }}
-            value={allocatingVotes || ''}
-          />
+              }}
+              value={allocatingVotes}
+              className="flex-1"
+            />
+            <span className="text-brand-blue font-eyebrow text-sm whitespace-nowrap">
+              / {voteLimit}
+            </span>
+          </div>
           <PrimaryButton 
             onClick={submitAllocation} 
-            disabled={isSubmitting}
+            disabled={isSubmitting || allocatingVotes === localCurrentAllocation}
           >
             {isSubmitting ? "Allocating..." : "Allocate"}
           </PrimaryButton>

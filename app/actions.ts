@@ -104,30 +104,33 @@ export const allocateVotes = async (
     throw new Error("You are not a participant in this event");
   }
 
+  // Get current allocation if it exists
+  const { data: currentAllocation } = await supabase
+    .from("project_allocations")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("project_id", projectId)
+    .eq("event_id", eventId)
+    .single();
+
+  // Calculate the vote difference
+  const currentVotes = currentAllocation?.votes || 0;
+  const voteDifference = amount - currentVotes;
+
   // Check if they have enough votes
-  if (eventParticipant.available_votes < amount) {
+  if (eventParticipant.available_votes < voteDifference) {
     throw new Error("You don't have enough votes");
   }
 
-  // Insert vote
-  const { error: voteError } = await supabase.from("transactions").insert({
-    user_id: user.id,
-    project_id: projectId,
-    amount,
+  // Begin transaction
+  const { error: transactionError } = await supabase.rpc('allocate_votes', {
+    p_event_id: eventId,
+    p_project_id: projectId,
+    p_amount: amount,
   });
 
-  if (voteError) {
-    throw new Error("Failed to submit vote");
-  }
-
-  // Update available votes
-  const { error: updateError } = await supabase
-    .from("event_participants")
-    .update({ available_votes: eventParticipant.available_votes - amount })
-    .eq("id", eventParticipant.id);
-
-  if (updateError) {
-    throw new Error("Failed to update available votes");
+  if (transactionError) {
+    throw new Error("Failed to allocate votes: " + transactionError.message);
   }
 
   return {
