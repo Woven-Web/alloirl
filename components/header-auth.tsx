@@ -101,7 +101,9 @@ export default function HeaderAuth() {
         {availableVotes ?? 0} votes
       </Link>
       <span>|</span>
-      <span>{profile?.name || user.email}</span>
+      <Link href="/profile" className="hover:opacity-80">
+        {profile?.name || user.email}
+      </Link>
       <span>|</span>
       <form action={signOutAction}>
         <button type="submit" className="hover:opacity-80">

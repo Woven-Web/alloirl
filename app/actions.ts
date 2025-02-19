@@ -262,6 +262,32 @@ export const importGitcoinRound = async (url: string, checkOnly = false) => {
   }
 };
 
+export const updateProfileName = async (formData: FormData) => {
+  const name = formData.get('name') as string;
+
+  if (!name) {
+    return encodedRedirect('error', '/profile/edit', 'Name is required');
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return encodedRedirect('error', '/profile/edit', 'You must be signed in');
+  }
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ name })
+    .eq('id', user.id);
+
+  if (error) {
+    return encodedRedirect('error', '/profile/edit', 'Failed to update profile');
+  }
+
+  return encodedRedirect('success', '/profile', 'Profile updated successfully');
+};
+
 export const purchaseCredits = async (amount: number) => {
   const supabase = await createClient();
   const {
