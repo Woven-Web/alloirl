@@ -24,6 +24,7 @@ const CONFIG = {
     time: {
         interval: 15,     // minutes between time slots
         eventDuration: 6, // duration in hours
+        startHour: 14,    // 2 PM in 24-hour format
         format: (time) => {
             // Custom format to show "10 PM", "11 PM", etc.
             const hours = time.getHours();
@@ -60,9 +61,10 @@ function getEventTiming() {
     now.setSeconds(0);
     now.setMilliseconds(0);
 
-    // For testing: Set event start to 2 hours before now
+    // Set event start to configured hour
     const eventStart = new Date(now);
-    eventStart.setHours(now.getHours() - 2);
+    eventStart.setHours(CONFIG.time.startHour);
+    eventStart.setMinutes(0);
     
     // Event end is 6 hours after event start
     const eventEnd = new Date(eventStart);
@@ -263,10 +265,10 @@ function drawTimeline(svg, data, timeScale, height) {
         // Add hour labels only (when minutes are 0)
         if (slot.timestamp.getMinutes() === 0) {
             // Only skip if this is the first slot AND it's too close to the edge
-            if (i === 0 && x < 50) {
-                console.log("Skipping first label due to position:", x);
-                return;
-            }
+            // if (i === 0 && x < 50) {
+            //     console.log("Skipping first label due to position:", x);
+            //     return;
+            // }
             timeHeader.append("div")
                 .attr("class", "time-label")
                 .style("position", "absolute")

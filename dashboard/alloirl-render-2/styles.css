@@ -262,10 +262,6 @@ body {
   text-anchor: middle;
 }
 
-.project:hover {
-  transform: translateX(-2px);
-}
-
 .attendee {
   display: flex;
   align-items: center;
