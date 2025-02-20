@@ -2,15 +2,14 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { FormMessage } from "@/components/form-message";
+import { updateUsername } from "@/app/actions";
 
 export default function UsernameForm() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,76 +17,29 @@ export default function UsernameForm() {
     setLoading(true);
     setError(null);
 
-    if (!name.trim()) {
-      setError("Name cannot be empty");
+    const formData = new FormData();
+    formData.append("name", name);
+    
+    const result = await updateUsername(formData);
+    
+    if ('error' in result) {
+      setError(result.error || "An error occurred");
       setLoading(false);
-      return;
-    }
-
-    // Basic validation
-    if (name.length < 2) {
-      setError("Name must be at least 2 characters long");
-      setLoading(false);
-      return;
-    }
-
-    if (!/^[a-zA-Z0-9\s_-]+$/.test(name)) {
-      setError(
-        "Name can only contain letters, numbers, spaces, underscores and dashes"
-      );
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          name: name.trim(),
-        })
-        .eq("id", (await supabase.auth.getUser()).data.user?.id);
-
-      if (updateError) {
-        // Check for unique constraint violation
-        if (updateError.code === '23505') {
-          throw new Error(`The name "${name}" is already taken. Please choose another.`);
-        }
-        throw updateError;
-      }
-
-      router.push("/?message=Name set successfully!&type=success");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
+    } else if ('refresh' in result) {
+      window.location.href = result.url;
     }
   };
 
   const handleUseGeneratedName = async () => {
-    setLoading(true);
-    setError(null);
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("User not found");
       
-      // Get the last 8 characters of the UUID
+      // Get the last 8 characters of the UUID and set it in the input
       const generatedName = user.id.slice(-8);
-
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
-          name: generatedName,
-        })
-        .eq("id", user.id);
-
-      if (updateError) throw updateError;
-
-      router.push("/?message=Name set successfully!&type=success");
+      setName(generatedName);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
     }
   };
 
