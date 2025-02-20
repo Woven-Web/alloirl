@@ -199,13 +199,20 @@ function drawTimeline(svg, data, timeScale, height) {
             .attr("y1", 0)
             .attr("y2", height);
 
-        // Add hour labels only (when minutes are 0)
+        // Add hour lines and labels when minutes are 0
         if (slot.timestamp.getMinutes() === 0) {
-            // Only skip if this is the first slot AND it's too close to the edge
-            // if (i === 0 && x < 50) {
-            //     console.log("Skipping first label due to position:", x);
-            //     return;
-            // }
+            // Add vertical hour line
+            svg.append("line")
+                .attr("class", "hour-line")
+                .attr("x1", x)
+                .attr("x2", x)
+                .attr("y1", 0)
+                .attr("y2", height)
+                .attr("stroke", "#F3FD8B")
+                .attr("stroke-width", "0.5px")
+                .attr("stroke-opacity", "1");
+
+            // Add hour label
             timeHeader.append("div")
                 .attr("class", "time-label")
                 .style("position", "absolute")
@@ -216,7 +223,7 @@ function drawTimeline(svg, data, timeScale, height) {
         }
     });
     
-    // Add a red current time indicator line
+    // Add a current time indicator line
     const { currentTime } = getEventTiming();
     const currentX = timeScale(currentTime);
     svg.append("line")
@@ -225,7 +232,7 @@ function drawTimeline(svg, data, timeScale, height) {
         .attr("x2", currentX)
         .attr("y1", 0)
         .attr("y2", height)
-        .attr("stroke", "red")
+        .attr("stroke", "#F3FD8B")
         .attr("stroke-width", "2px");
 }
 
@@ -317,15 +324,9 @@ function drawConnections(svg, data, timeScale, projectPositions) {
     const containerDim = getContainerDimensions();
     const drawableWidth = containerDim.width - CONFIG.margin.left - CONFIG.margin.right;
     
+    // First draw all paths
     data.timeSlots.forEach((slot, slotIndex) => {
         slot.votes.forEach(vote => {
-            svg.append("circle")
-                .attr("class", "vote-point")
-                .attr("cx", timeScale(slot.timestamp))
-                .attr("cy", vote.yPosition)
-                .attr("r", 4)
-                .attr("fill", "white");
-
             const project = data.projects.find(p => p.id === vote.projectId);
             if (!project) return;
 
@@ -352,6 +353,18 @@ function drawConnections(svg, data, timeScale, projectPositions) {
                 .attr("stroke", "white")
                 .attr("fill", "none")
                 .style("stroke-width", `${strokeWidth}px`);
+        });
+    });
+
+    // Then draw all points
+    data.timeSlots.forEach((slot, slotIndex) => {
+        slot.votes.forEach(vote => {
+            svg.append("circle")
+                .attr("class", "vote-point")
+                .attr("cx", timeScale(slot.timestamp))
+                .attr("cy", vote.yPosition)
+                .attr("r", 4)
+                .attr("fill", "white");
         });
     });
 }
@@ -406,80 +419,8 @@ async function updateVisualization() {
 // Initial render needs to be async too:
 (async function init() {
     await updateVisualization();
-    createControlPanel();
 })();
 
-// Create control panel
-function createControlPanel() {
-    const panel = d3.select('body')
-        .append('div')
-        .attr('class', 'control-panel');
-    
-    // NPL controls
-    const nplRow = panel.append('div')
-        .attr('class', 'control-row');
-    
-    nplRow.append('span')
-        .attr('class', 'control-label')
-        .text('npl: ');
-    
-    nplRow.append('button')
-        .attr('class', 'control-button')
-        .text('-')
-        .on('click', () => {
-            if (nodesPerLine > 1) {
-                nodesPerLine--;
-                updateVisualization();
-            }
-        });
-    
-    nplRow.append('span')
-        .attr('class', 'control-label')
-        .text(() => nodesPerLine);
-    
-    nplRow.append('button')
-        .attr('class', 'control-button')
-        .text('+')
-        .on('click', () => {
-            nodesPerLine++;
-            updateVisualization();
-        });
-
-    // Project count controls
-    const projRow = panel.append('div')
-        .attr('class', 'control-row');
-    
-    projRow.append('span')
-        .attr('class', 'control-label')
-        .text('proj: ');
-    
-    projRow.append('button')
-        .attr('class', 'control-button')
-        .text('-')
-        .on('click', () => {
-            if (numProjects > 1) {
-                numProjects--;
-                updateVisualization();
-            }
-        });
-    
-    projRow.append('span')
-        .attr('class', 'control-label')
-        .text(() => numProjects);
-    
-    projRow.append('button')
-        .attr('class', 'control-button')
-        .text('+')
-        .on('click', () => {
-            numProjects++;
-            updateVisualization();
-        });
-
-    // Debug row for event timing info, placed at the bottom left
-    panel.append('div')
-        .attr('class', 'control-row event-timing')
-        .style('margin-top', '10px');
-}
 
 // Simple debounce function
 function debounce(func, wait) {

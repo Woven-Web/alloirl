@@ -40,6 +40,8 @@ body {
   display: flex;
   align-items: center;
   margin: 0;
+  font-size: 18px;
+  font-weight: 500;
 }
 
 .header-credits {
@@ -47,6 +49,8 @@ body {
   padding-right: 24px;
   display: flex;
   align-items: center;
+  font-size: 18px;
+  font-weight: 500;
 }
 
 .header-timeline {
@@ -58,13 +62,18 @@ body {
   position: relative;
   overflow: visible;
   min-height: 60px;
+  font-size: 18px;
+  font-weight: 500;
 }
 
 .header-projects {
-  width: 320px;
+  font-size: 18px;
+  font-weight: 500;
+  width: 335px;
   padding: 0 0;
   display: flex;
   align-items: center;
+  justify-content: center;
   height: 60px;
   line-height: 60px;
 }
@@ -125,22 +134,33 @@ body {
 .project-header {
   color: #0001B2;
   background: #F3FD8B;
-  padding: 12px 20px;
+  padding: 8px 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   line-height: 1;
 }
 
+.footer {
+  height: 50px; 
+  background: #F3FD8B;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
 .project-header-left {
   font-size: 38px;
-  font-weight: 500;
+  font-weight: 700;
 }
 
 .project-header-right {
   font-size: 22px;
   font-weight: 500;
   text-align: right;
+  align-self: flex-start;
+  margin-top: 2px;
 }
 
 .project-content {
@@ -183,10 +203,6 @@ body {
   gap: 4px;
   cursor: pointer;
   transition: transform 0.2s ease;
-}
-
-.interaction-button:hover {
-  transform: scale(1.05);
 }
 
 #visualization {
@@ -235,20 +251,10 @@ body {
   stroke-width: 1; */
 }
 
-.vote-point:hover {
-  r: 3.5;
-  fill: #FFFFFF;
-}
-
 .connection {
   stroke: #F3FD8B;
   stroke-width: 1.5;
-  transition: all 0.2s ease;
-}
-
-.connection:hover {
-  stroke: #F3FD8B;
-  stroke-width: 2;
+  z-index: 100;
 }
 
 .timeline-point {
@@ -293,7 +299,7 @@ body {
   text-align: right;
 }
 
-.credit-indicator {
+/* .credit-indicator {
   width: 16px;
   height: 16px;
   border: 2px solid #F3FD8B;
@@ -307,7 +313,7 @@ body {
 
 .credit-indicator.half {
   background: linear-gradient(90deg, #F3FD8B 50%, transparent 50%);
-}
+} */
 
 /* .grid-line {
   stroke: #333333;
@@ -330,10 +336,19 @@ body {
   padding: 0 4px;
 }
 
+.header-projects-arrow {
+  font-size: 38px;
+  padding-left: 10px;
+  margin-bottom: 2px;
+}
+
 .vote-point {
   fill: #F3FD8B;
-  r: 6;
+  /* stroke: #0001B2;
+  stroke-width: 2px; */
+  r: 8;
   transition: r 0.2s ease;
+  z-index: 50;
 }
 
 
@@ -341,15 +356,21 @@ body {
 .intersection-dot {
   /* Common styling for intersection dots */
   transition: r 0.2s ease;
+  stroke: #0001B2;
+  /* stroke-width: 2px; */
   /* stroke-width: 8px; */
   r: 4;
+  z-index: 50;
 }
 
 .intersection-dot.past {
   fill: #F3FD8B;  /* Filled yellow (adjust as needed) */
   stroke-width: 1px;
   /* stroke: #0001B2; */
-  r: 2;
+  r: 3;
+  stroke: #0001B2;
+  stroke-width: 2px;
+  z-index: 50;
 }
 
 .intersection-dot.future {
@@ -358,4 +379,5 @@ body {
   opacity: 0.6;
   stroke-width: 0.5px;
   r: 2;
+  z-index: 50;
 }
