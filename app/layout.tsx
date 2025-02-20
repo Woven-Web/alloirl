@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={geistSans.className} suppressHydrationWarning>
-      <body className="bg-brand-yellow" suppressHydrationWarning>
+      <body className="" suppressHydrationWarning>
         <Toaster position="top-center" />
         <main className="min-h-screen flex flex-col">
           <nav className="w-full flex justify-between items-center p-4">
