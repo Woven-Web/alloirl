@@ -96,7 +96,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
                 key={allocation.id} 
                 className="text-brand-blue font-eyebrow text-lg"
               >
-                {timeAgo} | {allocation.profiles?.[0]?.name} | {allocation.votes}
+                {timeAgo} ago | {allocation.profiles?.[0]?.name ?? allocation.user_id.substring(0, 6)} | {allocation.votes} votes
               </div>
             );
           })}
