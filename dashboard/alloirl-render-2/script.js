@@ -274,7 +274,7 @@ function drawProjects(projects) {
     
     content.append("div")
         .attr("class", "project-path")
-        .text(d => `${d.numberContributions} people • ${d.contributionAmount} votes`);
+        .text(d => `${d.numberContributions} ${d.numberContributions === 1 ? 'person' : 'people'} • ${d.contributionAmount} ${d.contributionAmount === 1 ? 'vote' : 'votes'}`);
 
     // Calculate positions for connections
     return calculateProjectPositions(projects, projectsContainer);
