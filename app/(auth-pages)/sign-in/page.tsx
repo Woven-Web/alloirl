@@ -37,7 +37,7 @@ export default function Login() {
   }, [email, params]);
 
   return (
-    <div className="w-[390px] flex flex-col items-center">
+    <div className="w-[390px] flex flex-col items-center p-4">
       <div className="mb-12">
         <AlloLogo width={218} height={175} />
       </div>
