@@ -97,10 +97,10 @@ export default function HeaderAuth() {
 
   return user ? (
     <div className="flex items-center gap-4 text-brand-blue font-eyebrow text-sm">
-      <Link href="/votes" className="hover:opacity-80">
+      {/* <Link href="/votes" className="hover:opacity-80">
         {availableVotes ?? 0} votes
-      </Link>
-      <span>|</span>
+      </Link> */}
+      {/* <span>|</span> */}
       <Link href="/profile" className="hover:opacity-80">
         {profile?.name || user.email}
       </Link>
