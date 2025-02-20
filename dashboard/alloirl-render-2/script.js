@@ -1,5 +1,7 @@
+import { fetchEventData } from './supabase.js';
+
 // Configuration object for the visualization
-const CONFIG = {
+export const CONFIG = {
     dimensions: {
         width: 960,
         height: 500,
@@ -24,7 +26,7 @@ const CONFIG = {
     time: {
         interval: 15,     // minutes between time slots
         eventDuration: 6, // duration in hours
-        startHour: 14,    // 2 PM in 24-hour format
+        startHour: 13, // 24h format
         format: (time) => {
             // Custom format to show "10 PM", "11 PM", etc.
             const hours = time.getHours();
@@ -99,76 +101,11 @@ function generateTimeSlots() {
     });
 }
 
-/**
- * Generates the complete dataset for visualization
- * @param {number} npl - Nodes per line
- * @param {Object} dims - Visualization dimensions
- * @returns {Object} Dataset with timeSlots, projects, and attendees
- */
-function generateData(npl, dims) {
-    const timeSlots = generateTimeSlots();
-    
-    // Create projects with unique IDs and names
-    const projects = Array.from({ length: numProjects }, (_, id) => ({ 
-        id: id + 1, 
-        name: `Project ${String.fromCharCode(65 + id)}`,
-        votes: []
-    }));
-
-    // Generate attendees
-    const attendees = Array.from({ length: CONFIG.attendees.count }, (_, id) => ({
-        id: id + 1,
-        displayId: `Attendee#${String(id + 1).padStart(3, '0')}`,
-        credits: Math.floor(Math.random() * (CONFIG.attendees.maxCredits - CONFIG.attendees.minCredits + 1)) + CONFIG.attendees.minCredits,
-        votes: [],
-        lane: id
-    }));
-
-    // Calculate lane height based on fixed grid
-    const laneHeight = CONFIG.grid.rowHeight;
-
-    // Generate votes for each attendee in each time slot
-    attendees.forEach((attendee) => {
-        timeSlots.forEach((slot, slotIndex) => {
-            // Only generate votes for time slots that are in the past
-            if (!slot.isPast) return;
-            
-            // 20% chance of voting in this time slot (reduced from 30%)
-            if (Math.random() > 0.2) return;
-            
-            // 1-2 votes when they do vote
-            const votesThisSlot = Math.floor(Math.random() * 2) + 1;
-            
-            for (let i = 0; i < votesThisSlot; i++) {
-                const voteId = `vote_${slotIndex}_${attendee.id}_${i}`;
-                const projectIndex = Math.floor(Math.random() * projects.length);
-                
-                // Add vote to time slot with fixed y-position based on attendee's lane
-                slot.votes.push({
-                    id: voteId,
-                    projectId: projects[projectIndex].id,
-                    attendeeId: attendee.id,
-                    yPosition: (attendee.lane * laneHeight) + (laneHeight / 2)
-                });
-                
-                // Cross-reference vote in project
-                projects[projectIndex].votes.push({
-                    timeSlotIndex: slotIndex,
-                    voteId: voteId,
-                    attendeeId: attendee.id
-                });
-
-                // Cross-reference vote in attendee
-                attendee.votes.push({
-                    timeSlotIndex: slotIndex,
-                    voteId: voteId,
-                    projectId: projects[projectIndex].id
-                });
-            }
-        });
-    });
-
-    return { timeSlots, projects, attendees };
+// Replace generateData function with:
+async function generateData(npl, dims) {
+    // Replace with actual event ID
+    const eventId = '93c21659-3bd2-4d02-9270-0aa77230c700';
+    return await fetchEventData(eventId);
 }
 
 /**
@@ -314,11 +251,11 @@ function drawProjects(projects) {
     
     const headerLeft = headers.append("div")
         .attr("class", "project-header-left")
-        .text(d => formatMoney(Math.floor(Math.random() * 5000)));
+        .text(d => formatMoney(d.matchingAmount));
     
     const headerRight = headers.append("div")
         .attr("class", "project-header-right")
-        .text(d => `${getOrdinal(d.id)} place`);
+        .text((d, i) => `${getOrdinal(i + 1)} place`);
 
     // Add content section (simplified)
     const content = projectDivs.append("div")
@@ -330,7 +267,7 @@ function drawProjects(projects) {
     
     content.append("div")
         .attr("class", "project-path")
-        .text(d => `project.name/app/${d.name.toLowerCase()}`);
+        .text(d => `${d.numberContributions} people • ${d.contributionAmount} votes`);
 
     // Calculate positions for connections
     return calculateProjectPositions(projects, projectsContainer);
@@ -459,15 +396,18 @@ function updateEventHeader() {
         .html(`Event: ${CONFIG.time.format(eventStart)} - ${CONFIG.time.format(eventEnd)} | Now: ${CONFIG.time.format(currentTime)}`);
 }
 
-// Update visualization (called on changes)
-function updateVisualization() {
-    const data = generateData(nodesPerLine, DIMS);
+// Update updateVisualization to be async:
+async function updateVisualization() {
+    const data = await generateData(nodesPerLine, DIMS);
     createVisualization(data, CONFIG, DIMS);
     updateEventHeader();
 }
 
-// Initialize
-updateVisualization();
+// Initial render needs to be async too:
+(async function init() {
+    await updateVisualization();
+    createControlPanel();
+})();
 
 // Create control panel
 function createControlPanel() {
@@ -559,10 +499,6 @@ window.addEventListener('resize', debounce(() => {
     updateVisualization();
 }, 250));
 
-// Initial render
-updateVisualization();
-createControlPanel();
-
 // Add ordinal formatter function
 function getOrdinal(n) {
     const s = ["th", "st", "nd", "rd"];
@@ -572,7 +508,7 @@ function getOrdinal(n) {
 
 // Add number formatter function
 function formatMoney(n) {
-    return `$${n.toLocaleString()}`;
+    return `$${Math.round(n).toLocaleString()}`;
 }
 
 /* New function to draw intersection dots for each attendee and each time slot where no vote exists */

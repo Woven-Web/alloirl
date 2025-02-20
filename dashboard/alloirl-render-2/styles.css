@@ -35,7 +35,7 @@ body {
 }
 
 .header-attendee {
-  width: 300px;
+  width: 250px;
   padding: 0 24px;
   display: flex;
   align-items: center;
@@ -152,7 +152,7 @@ body {
 
 .project-name {
   color: #F3FD8B;
-  font-size: 36px;
+  font-size: 26px;
   font-weight: 500;
   line-height: 1;
 }
