@@ -4,6 +4,18 @@ import { NextResponse } from 'next/server';
 const MATCHING_POOL = 5000; // Will come from events table later
 const THRESHOLD = 25.0; // Same as original QF implementation
 
+// Add CORS headers helper
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+// Handle OPTIONS request for CORS preflight
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
+
 interface ProjectAllocation {
   project_id: string;
   user_id: string;
@@ -126,7 +138,7 @@ export async function POST(request: Request) {
     if (!eventId) {
       return NextResponse.json(
         { error: 'Missing eventId parameter' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       );
     }
 
@@ -142,14 +154,14 @@ export async function POST(request: Request) {
     if (error) {
       return NextResponse.json(
         { error: 'Failed to fetch allocations' },
-        { status: 500 }
+        { status: 500, headers: corsHeaders }
       );
     }
 
     if (!allocations || allocations.length === 0) {
       return NextResponse.json(
         { error: 'No allocations found for this event' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       );
     }
 
@@ -162,12 +174,12 @@ export async function POST(request: Request) {
     // Calculate matching amounts
     const results = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
 
-    return NextResponse.json(results);
+    return NextResponse.json(results, { headers: corsHeaders });
   } catch (error) {
     console.error('Error calculating matching amounts:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     );
   }
 } 
