@@ -3,6 +3,105 @@ import { notFound } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import Link from "next/link";
 
+const MATCHING_POOL = 5000; // Will come from events table later
+const THRESHOLD = 25.0;
+
+interface ProjectAllocation {
+  project_id: string;
+  user_id: string;
+  votes: number;
+}
+
+interface MatchingResult {
+  project_id: string;
+  matching_amount: number;
+  number_contributions: number;
+  contribution_amount: number;
+}
+
+function aggregateVotes(allocations: ProjectAllocation[]) {
+  const voteDict: Record<string, Record<string, number>> = {};
+  
+  for (const allocation of allocations) {
+    if (!voteDict[allocation.project_id]) {
+      voteDict[allocation.project_id] = {};
+    }
+    voteDict[allocation.project_id][allocation.user_id] = allocation.votes;
+  }
+  
+  return voteDict;
+}
+
+function getTotalsByPair(voteDict: Record<string, Record<string, number>>) {
+  const pairTotals: Record<string, Record<string, number>> = {};
+
+  for (const projectVotes of Object.values(voteDict)) {
+    for (const [user1, votes1] of Object.entries(projectVotes)) {
+      if (!pairTotals[user1]) {
+        pairTotals[user1] = {};
+      }
+
+      for (const [user2, votes2] of Object.entries(projectVotes)) {
+        if (!pairTotals[user1][user2]) {
+          pairTotals[user1][user2] = 0;
+        }
+        pairTotals[user1][user2] += Math.sqrt(votes1 * votes2);
+      }
+    }
+  }
+
+  return pairTotals;
+}
+
+function calculateMatching(
+  voteDict: Record<string, Record<string, number>>,
+  pairTotals: Record<string, Record<string, number>>,
+  threshold: number,
+  matchingPool: number
+): MatchingResult[] {
+  let totalMatching = 0;
+  const results: MatchingResult[] = [];
+
+  for (const [projectId, votes] of Object.entries(voteDict)) {
+    let matchingAmount = 0;
+    let numContributions = 0;
+    let totalVotes = 0;
+
+    const contributors = Object.entries(votes);
+    
+    for (const [user1, votes1] of contributors) {
+      numContributions++;
+      totalVotes += votes1;
+      
+      matchingAmount += Math.sqrt(votes1);
+      
+      for (const [user2, votes2] of contributors) {
+        if (user2 > user1) {
+          matchingAmount += Math.sqrt(votes1 * votes2) / (pairTotals[user1][user2] / (threshold + 1));
+        }
+      }
+    }
+
+    if (typeof matchingAmount === 'number' && !isNaN(matchingAmount)) {
+      totalMatching += matchingAmount;
+      results.push({
+        project_id: projectId,
+        matching_amount: matchingAmount,
+        number_contributions: numContributions,
+        contribution_amount: totalVotes
+      });
+    }
+  }
+
+  const normalizationFactor = matchingPool / totalMatching;
+  results.forEach(result => {
+    result.matching_amount *= normalizationFactor;
+    result.matching_amount = Math.round(result.matching_amount * 100) / 100;
+  });
+
+  return results;
+}
+
 export default async function EventPage({
   params,
 }: {
@@ -35,6 +134,19 @@ export default async function EventPage({
 
   const isAdmin = participant?.is_admin ?? false;
 
+  // Fetch all allocations for matching calculation
+  const { data: allocations } = await supabase
+    .from('project_allocations')
+    .select('project_id, user_id, votes')
+    .eq('event_id', eventId)
+    .gt('votes', 0);
+
+  // Calculate matching amounts
+  const voteDict = aggregateVotes(allocations || []);
+  const pairTotals = getTotalsByPair(voteDict);
+  const matchingResults = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
+  const matchingMap = new Map(matchingResults.map(result => [result.project_id, result]));
+
   // Fetch projects associated with this event
   const { data: projects } = await supabase
     .from("projects")
@@ -48,7 +160,8 @@ export default async function EventPage({
   const projectsWithVotes = projects?.map(project => ({
     ...project,
     total_votes: project.project_allocations?.reduce((sum: number, allocation: { votes: number | null }) => 
-      sum + (allocation.votes || 0), 0) || 0
+      sum + (allocation.votes || 0), 0) || 0,
+    matching_amount: matchingMap.get(project.id)?.matching_amount || 0
   }))
   .sort((a, b) => b.total_votes - a.total_votes);
 
@@ -78,7 +191,10 @@ export default async function EventPage({
                 className="flex justify-between items-center text-brand-blue font-eyebrow text-xl hover:opacity-80 py-2"
               >
                 <span>{project.name}</span>
-                <span className="text-lg">{project.total_votes} votes</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-lg">{project.total_votes} votes</span>
+                  <span className="text-lg text-green-600">~${Math.round(project.matching_amount)}</span>
+                </div>
               </Link>
             ))}
           </div>
