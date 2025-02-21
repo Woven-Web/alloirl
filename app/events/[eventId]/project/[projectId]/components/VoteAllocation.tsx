@@ -170,9 +170,9 @@ export function VoteAllocation({
             <span className="text-brand-blue font-eyebrow text-sm">
               {availableVotes} available
             </span>
-            <span className="text-brand-blue/60 font-eyebrow text-xs">
+            {/* <span className="text-brand-blue/60 font-eyebrow text-xs">
               {localCurrentAllocation} currently allocated
-            </span>
+            </span> */}
           </div>
         </div>
         <div className="flex gap-4">

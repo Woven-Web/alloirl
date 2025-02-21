@@ -87,7 +87,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-brand-blue font-eyebrow text-2xl">Recent Allocations</h2>
+        <h2 className="text-brand-blue font-eyebrow text-2xl">Allocations</h2>
         <div className="space-y-2">
           {allocations.map((allocation) => {
             const timeAgo = getTimeAgo(new Date(allocation.created_at));
