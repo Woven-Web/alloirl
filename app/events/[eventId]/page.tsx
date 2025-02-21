@@ -38,8 +38,19 @@ export default async function EventPage({
   // Fetch projects associated with this event
   const { data: projects } = await supabase
     .from("projects")
-    .select("*")
+    .select(`
+      *,
+      project_allocations(votes)
+    `)
     .eq("event_id", eventId);
+
+  // Calculate total votes for each project and sort by votes
+  const projectsWithVotes = projects?.map(project => ({
+    ...project,
+    total_votes: project.project_allocations?.reduce((sum: number, allocation: { votes: number | null }) => 
+      sum + (allocation.votes || 0), 0) || 0
+  }))
+  .sort((a, b) => b.total_votes - a.total_votes);
 
   return (
     <div className="flex flex-col w-full px-4 space-y-8">
@@ -58,15 +69,16 @@ export default async function EventPage({
       <div className="space-y-4">
         <h2 className="text-brand-blue font-eyebrow text-4xl">Projects</h2>
         
-        {projects && projects.length > 0 ? (
+        {projectsWithVotes && projectsWithVotes.length > 0 ? (
           <div className="space-y-4">
-            {projects.map((project) => (
+            {projectsWithVotes.map((project) => (
               <Link 
                 key={project.id} 
                 href={`/events/${eventId}/project/${project.id}`} 
-                className="block text-brand-blue font-eyebrow text-xl hover:opacity-80"
+                className="flex justify-between items-center text-brand-blue font-eyebrow text-xl hover:opacity-80 py-2"
               >
-                {project.name}
+                <span>{project.name}</span>
+                <span className="text-lg">{project.total_votes} votes</span>
               </Link>
             ))}
           </div>
