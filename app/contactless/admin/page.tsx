@@ -36,7 +36,7 @@ export default async function AdminDashboard() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="text-brand-blue font-eyebrow text-2xl">Link Card</h2>
+          <h2 className="text-brand-blue font-eyebrow text-2xl">Add Link</h2>
           <div className="flex gap-4">
             <Suspense
               fallback={
