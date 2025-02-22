@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import Link from "next/link";
 // import { useToast } from "@/components/ui/use-toast";
 
-const EMOJI_OPTIONS = ['👍', '❤️', '🎉', '🚀', '💡'] as const;
+const EMOJI_OPTIONS = ['❤️', '🎉', '🚀', '💡', '🌱', '🐸'] as const;
 type EmojiOption = typeof EMOJI_OPTIONS[number];
 
 interface EventParticipant {
@@ -195,6 +195,12 @@ export function VoteAllocation({
                 / {voteLimit}
               </span>
             </div>
+            <PrimaryButton 
+              onClick={submitAllocation} 
+              disabled={isSubmitting || allocatingVotes === localCurrentAllocation}
+            >
+              {isSubmitting ? "Allocating..." : "Allocate"}
+            </PrimaryButton>
           </div>
           
           <div className="flex flex-col gap-2">
@@ -215,14 +221,6 @@ export function VoteAllocation({
               ))}
             </div>
           </div>
-
-          <PrimaryButton 
-            onClick={submitAllocation} 
-            disabled={isSubmitting || allocatingVotes === localCurrentAllocation}
-            className="w-full"
-          >
-            {isSubmitting ? "Allocating..." : "Allocate"}
-          </PrimaryButton>
         </div>
       </div>
     </div>

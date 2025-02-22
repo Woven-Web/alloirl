@@ -21,7 +21,7 @@ interface Allocation {
   }[] | null;
 }
 
-const EMOJI_OPTIONS = ['👍', '❤️', '🎉', '🚀', '💡'] as const;
+// const EMOJI_OPTIONS = ['👍', '❤️', '🎉', '🚀', '💡'] as const;
 
 export function ProjectDetails({ project }: ProjectDetailsProps) {
   const [votes, setVotes] = useState({ total: 0, unique: 0 });
@@ -118,8 +118,9 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
                 key={allocation.id} 
                 className="text-brand-blue font-eyebrow text-lg flex items-center gap-2"
               >
-                <span>{timeAgo} ago | {allocation.profiles?.[0]?.name ?? allocation.user_id.substring(0, 6)} | {allocation.votes} votes</span>
-                {allocation.reaction && <span className="text-2xl">{allocation.reaction}</span>}
+                <span>{timeAgo} ago | {allocation.profiles?.[0]?.name ?? allocation.user_id.substring(0, 6)} | {allocation.votes} votes
+                {allocation.reaction && <span className="text-2xl">{" "}{allocation.reaction}</span>}
+                </span>
               </div>
             );
           })}
