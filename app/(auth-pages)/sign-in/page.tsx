@@ -29,6 +29,7 @@ export default function Login() {
 
   let message = params.get("message") || "";
   let isOtpSent = params.get("otpSent") === "1";
+  let showOtpField = isOtpSent || message.toLowerCase().includes("token has expired or is invalid");
 
   useEffect(() => {
     if (params.get("email") && !email) {
@@ -66,7 +67,7 @@ export default function Login() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full h-[60px] bg-transparent border-2 border-brand-blue rounded-[10px] font-eyebrow text-lg text-brand-blue text-center placeholder:text-brand-blue"
         />
-        {isOtpSent && (
+        {showOtpField && (
           <Input
             type="number"
             name="code"
@@ -77,7 +78,7 @@ export default function Login() {
           />
         )}
         <SubmitButton
-          pendingText={isOtpSent ? "Validating OTP..." : "Sending OTP..."}
+          pendingText={showOtpField ? "Validating OTP..." : "Sending OTP..."}
           className="w-full h-[60px] bg-brand-blue hover:bg-brand-blue/90 border-2 border-brand-blue rounded-[10px] font-eyebrow text-lg text-brand-yellow"
         >
           Enter

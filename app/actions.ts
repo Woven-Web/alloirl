@@ -104,7 +104,7 @@ export const signInAction = async (formData: FormData) => {
             {
               user_id: user.id,
               event_id: allowlistEntry.event_id,
-              available_votes: 10,
+              available_votes: 69,
               is_admin: false,
             },
           ]);
@@ -159,6 +159,7 @@ export const signInAction = async (formData: FormData) => {
   });
 
   if (error) {
+    console.error("Supabase OTP error:", error);
     return encodedRedirect("error", "/sign-in", error.message);
   }
 
@@ -519,5 +520,5 @@ export const updateUsername = async (formData: FormData) => {
     return { error: updateError.message };
   }
 
-  return { refresh: true, url: '/?message=Name set successfully!&type=success' };
+  return { refresh: true, url: '/events/a6dbab6b-a108-4147-ab09-0cdf0d802edb' };
 };

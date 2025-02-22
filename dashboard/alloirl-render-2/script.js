@@ -1,4 +1,4 @@
-import { fetchEventData } from './supabase.js';
+import { fetchEventData, subscribeToProjectAllocations } from './supabase.js';
 
 // Configuration object for the visualization
 export const CONFIG = {
@@ -104,7 +104,7 @@ function generateTimeSlots() {
 // Replace generateData function with:
 async function generateData(npl, dims) {
     // Replace with actual event ID
-    const eventId = '93c21659-3bd2-4d02-9270-0aa77230c700';
+    const eventId = 'a6dbab6b-a108-4147-ab09-0cdf0d802edb';
     return await fetchEventData(eventId);
 }
 
@@ -258,7 +258,12 @@ function drawProjects(projects) {
     
     const headerLeft = headers.append("div")
         .attr("class", "project-header-left")
-        .text(d => formatMoney(d.matchingAmount));
+        .text('$0'); // Start at 0
+    
+    // Animate the matching amounts
+    headerLeft.each(function(d) {
+        animateNumber(this, 0, d.matchingAmount, 1000, '$');
+    });
     
     const headerRight = headers.append("div")
         .attr("class", "project-header-right")
@@ -272,9 +277,26 @@ function drawProjects(projects) {
         .attr("class", "project-name")
         .text(d => d.name);
     
-    content.append("div")
+    const projectPath = content.append("div")
         .attr("class", "project-path")
-        .text(d => `${d.numberContributions} ${d.numberContributions === 1 ? 'person' : 'people'} • ${d.contributionAmount} ${d.contributionAmount === 1 ? 'vote' : 'votes'}`);
+        .text('0 people • 0 votes'); // Start at 0
+    
+    // Animate the contribution numbers
+    projectPath.each(function(d) {
+        const element = this;
+        // Create temporary elements for each number
+        const peopleSpan = document.createElement('span');
+        const votesSpan = document.createElement('span');
+        element.textContent = '';
+        element.appendChild(peopleSpan);
+        element.appendChild(document.createTextNode(' people • '));
+        element.appendChild(votesSpan);
+        element.appendChild(document.createTextNode(' votes'));
+        
+        // Animate both numbers
+        animateNumber(peopleSpan, 0, d.numberContributions, 1000);
+        animateNumber(votesSpan, 0, d.contributionAmount, 1000);
+    });
 
     // Calculate positions for connections
     return calculateProjectPositions(projects, projectsContainer);
@@ -395,11 +417,16 @@ function drawAttendees(attendees) {
         .attr("class", "attendee-id")
         .text(d => d.displayId);
 
-    // Add credits
-    attendeeElements
+    // Add credits with animation
+    const creditElements = attendeeElements
         .append("div")
         .attr("class", "attendee-credits")
-        .text(d => `${d.credits}cr`);
+        .text('0cr'); // Start at 0
+    
+    // Animate the credits
+    creditElements.each(function(d) {
+        animateNumber(this, 0, d.credits, 1000, '', 'cr');
+    });
 }
 
 /* Updated function to update event timing info in the control panel debug row */
@@ -418,9 +445,30 @@ async function updateVisualization() {
 
 // Initial render needs to be async too:
 (async function init() {
+    const eventId = 'a6dbab6b-a108-4147-ab09-0cdf0d802edb';
     await updateVisualization();
-})();
+    
+    // Set up realtime subscription
+    const channel = subscribeToProjectAllocations(eventId, async () => {
+        console.log('Project allocations updated');
+        // Use requestAnimationFrame to ensure smooth updates
+        requestAnimationFrame(async () => {
+            await updateVisualization();
+        });
+    });
 
+    // Set up periodic refresh every minute
+    // const refreshInterval = setInterval(async () => {
+    //     console.log('Periodic refresh triggered');
+    //     await updateVisualization();
+    // }, 60000); // 60000ms = 1 minute
+
+    // // Clean up subscription and interval when window unloads
+    // window.addEventListener('unload', () => {
+    //     channel.unsubscribe();
+    //     clearInterval(refreshInterval);
+    // });
+})();
 
 // Simple debounce function
 function debounce(func, wait) {
@@ -450,6 +498,30 @@ function getOrdinal(n) {
 // Add number formatter function
 function formatMoney(n) {
     return `$${Math.round(n).toLocaleString()}`;
+}
+
+// Add typewriter animation utility
+function animateNumber(element, start, end, duration = 1000, prefix = '', suffix = '') {
+    const startTime = performance.now();
+    const startValue = start || 0;
+    const change = end - startValue;
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Easing function (easeOutExpo)
+        const easing = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+        const current = Math.round(startValue + (change * easing));
+        
+        element.textContent = `${prefix}${current.toLocaleString()}${suffix}`;
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+    
+    requestAnimationFrame(update);
 }
 
 /* New function to draw intersection dots for each attendee and each time slot where no vote exists */

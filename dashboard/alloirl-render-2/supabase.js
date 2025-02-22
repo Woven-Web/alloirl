@@ -7,6 +7,76 @@ const supabaseUrl = 'https://uxylrdyyuidugrbbkurv.supabase.co'; // Replace with 
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4eWxyZHl5dWlkdWdyYmJrdXJ2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjM3MjY0MSwiZXhwIjoyMDUxOTQ4NjQxfQ.IMYYavm93SOK6cNa4V_is8MROrXZ-X610crXaEGan-8'; // Replace with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Initialize JSConfetti
+const jsConfetti = new JSConfetti();
+
+// Available emoji options (matching VoteAllocation.tsx)
+const EMOJI_OPTIONS = ['❤️', '🎉', '🚀', '💡', '🌱', '🐸', '🗿'];
+
+// Function to get a random emoji from the options
+function getRandomEmoji() {
+    return EMOJI_OPTIONS[Math.floor(Math.random() * EMOJI_OPTIONS.length)];
+}
+
+// Function to create a single emoji element
+function createEmojiElement(emoji, x, y, scale = 1) {
+    const element = document.createElement('div');
+    element.textContent = emoji;
+    element.style.position = 'fixed';
+    element.style.left = `${x}px`;
+    element.style.top = `${y}px`;
+    element.style.fontSize = `${24 * scale}px`;
+    element.style.zIndex = '9999';
+    element.style.pointerEvents = 'none';
+    element.style.transition = 'all 0.6s cubic-bezier(0.165, 0.84, 0.44, 1)';
+    element.style.opacity = '1';
+    return element;
+}
+
+// Function to animate emoji explosion
+function rainEmoji(emoji, count = 150) {
+    const container = document.body;
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    const centerX = windowWidth / 2;
+    const centerY = windowHeight / 2;
+    
+    for (let i = 0; i < count; i++) {
+        // Create emoji with random size
+        const scale = 0.5 + Math.random() * 1.5;
+        const element = createEmojiElement(emoji, centerX, centerY, scale);
+        container.appendChild(element);
+        
+        // Calculate random angle and distance for explosion effect
+        const angle = (Math.random() * Math.PI * 2);
+        const distance = 100 + Math.random() * 400;
+        const finalX = centerX + Math.cos(angle) * distance;
+        const finalY = centerY + Math.sin(angle) * distance;
+        
+        // Start animation after a tiny random delay
+        setTimeout(() => {
+            element.style.transform = `translate(${finalX - centerX}px, ${finalY - centerY}px) rotate(${Math.random() * 720 - 360}deg)`;
+            element.style.opacity = '0';
+        }, Math.random() * 50);
+        
+        // Remove element after animation
+        setTimeout(() => {
+            element.remove();
+        }, 1000);
+    }
+}
+
+// Function to create confetti explosion with emojis
+function createConfettiExplosion(emoji) {
+    jsConfetti.addConfetti({
+        emojis: [emoji],
+        emojiSize: 100,
+        confettiNumber: 150,
+        confettiRadius: 8,
+        confettiColors: ['#F3FD8B', '#ffffff'],
+    });
+}
+
 /**
  * Fetches and transforms data for the visualization
  * @param {string} eventId - UUID of the event to fetch data for
@@ -34,8 +104,7 @@ export async function fetchEventData(eventId) {
             supabase
                 .from('projects')
                 .select('*')
-                .eq('event_id', eventId)
-                .limit(5),
+                .eq('event_id', eventId),
             supabase.from('profiles')
                 .select('*'),
             fetch('http://localhost:3000/api/matching', {
@@ -182,4 +251,31 @@ function getEventTiming() {
         eventEnd,
         currentTime: now
     };
+}
+
+/**
+ * Sets up realtime subscription for project allocations
+ * @param {string} eventId - UUID of the event to watch
+ * @param {Function} onUpdate - Callback function to handle updates
+ * @returns {Object} Subscription channel
+ */
+export function subscribeToProjectAllocations(eventId, onUpdate) {
+    const channel = supabase
+        .channel('project_allocations_changes')
+        .on('postgres_changes', {
+            event: '*',  // Listen to all events
+            schema: 'public',
+            table: 'project_allocations',
+            filter: `event_id=eq.${eventId}`
+        }, (payload) => {
+            // Get reaction from payload or generate random one
+            const reaction = payload.new?.reaction || getRandomEmoji();
+            createConfettiExplosion(reaction);
+            
+            // Call the update callback to refresh the visualization
+            onUpdate();
+        })
+        .subscribe();
+
+    return channel;
 }

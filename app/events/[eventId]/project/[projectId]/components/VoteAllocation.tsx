@@ -9,7 +9,7 @@ import toast from 'react-hot-toast';
 import Link from "next/link";
 // import { useToast } from "@/components/ui/use-toast";
 
-const EMOJI_OPTIONS = ['❤️', '🎉', '🚀', '💡', '🌱', '🐸'] as const;
+const EMOJI_OPTIONS = ['❤️', '🎉', '🚀', '💡', '🌱', '🐸', '🗿'] as const;
 type EmojiOption = typeof EMOJI_OPTIONS[number];
 
 interface EventParticipant {
@@ -185,10 +185,10 @@ export function VoteAllocation({
                 min={0}
                 max={availableVotes + localCurrentAllocation}
                 onChange={(e) => {
-                  const value = e.target.value === '' ? undefined : parseInt(e.target.value);
-                  setAllocatingVotes(value || 0);
+                  const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+                  setAllocatingVotes(value);
                 }}
-                value={allocatingVotes || ''}
+                value={allocatingVotes}
                 className="flex-1"
               />
               <span className="text-brand-blue font-eyebrow text-sm whitespace-nowrap">
@@ -197,7 +197,11 @@ export function VoteAllocation({
             </div>
             <PrimaryButton 
               onClick={submitAllocation} 
-              disabled={isSubmitting || allocatingVotes === localCurrentAllocation}
+              disabled={
+                isSubmitting || 
+                allocatingVotes === localCurrentAllocation ||
+                allocatingVotes > (availableVotes + localCurrentAllocation)
+              }
             >
               {isSubmitting ? "Allocating..." : "Allocate"}
             </PrimaryButton>
