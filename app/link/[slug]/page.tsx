@@ -1,5 +1,12 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect, notFound } from "next/navigation";
+import { ProjectWithEvent } from "@/types/project";
+
+interface ContactlessLinkWithProject {
+  id: number;
+  name: string | null;
+  project: ProjectWithEvent;
+}
 
 export default async function ContactlessRedirectPage({
   params,
@@ -23,7 +30,7 @@ export default async function ContactlessRedirectPage({
     `,
     )
     .eq("slug", slug)
-    .single();
+    .single() as { data: ContactlessLinkWithProject | null; error: any };
 
   if (error) {
     return notFound();

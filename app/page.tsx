@@ -11,7 +11,7 @@ export default function Home() {
             Where IRL meets web3
           </h1>
           <p className="text-2xl font-body text-navy mb-12">
-            One-click participatory budgeting for real-world events. 
+            One-click participatory budgeting for real-world events with Allo Protocol.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a 
