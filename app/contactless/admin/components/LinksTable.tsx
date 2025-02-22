@@ -14,6 +14,7 @@ type Project = {
 type ProjectContactlessLink = {
   id: number;
   name: string;
+  slug: string;
   project: Project | null;
 };
 
@@ -98,6 +99,7 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
           .select(`
           id,
           name,
+          slug,
           project:project_id (
             id, name
           )
@@ -156,6 +158,9 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {link?.name}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              {link?.slug}
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
               {link.project && link.project.id && (

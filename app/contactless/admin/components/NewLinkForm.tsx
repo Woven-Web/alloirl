@@ -21,9 +21,11 @@ const NewLinkForm: React.FC<NewLinkFormProps> = ({ projects }) => {
   const [formData, setFormData] = useState<{
     name: string;
     projectId: string | null;
+    slug: string;
   }>({
     name: "",
     projectId: null,
+    slug: "",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,16 +34,18 @@ const NewLinkForm: React.FC<NewLinkFormProps> = ({ projects }) => {
 
     try {
       setIsCreating(true);
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("project_contactless_links")
         .insert({
           name: formData.name,
           project_id: formData.projectId,
+          slug: formData.slug,
         })
         .select(
           `
           id,
           name,
+          slug,
           project:project_id (
             id, name
           )
@@ -50,15 +54,6 @@ const NewLinkForm: React.FC<NewLinkFormProps> = ({ projects }) => {
         .single();
 
       if (error) throw error;
-      //
-      // // Call the callback with the new link
-      // onLinkCreated({
-      //   ...data,
-      //   id: String(data.id),
-      // });
-      //
-      // Reset form
-      setFormData({ name: "", projectId: null });
     } catch (err) {
       setError(err as PostgrestError);
     } finally {
@@ -93,6 +88,24 @@ const NewLinkForm: React.FC<NewLinkFormProps> = ({ projects }) => {
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
             placeholder="Enter link name"
+            required
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="slug"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Slug
+          </label>
+          <Input
+            type="text"
+            id="slug"
+            value={formData.slug}
+            onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
+            placeholder="Enter slug"
             required
           />
         </div>

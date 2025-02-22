@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       event_allowlist: {
@@ -184,6 +159,7 @@ export type Database = {
           event_id: string | null
           id: string
           project_id: string | null
+          reaction: string | null
           updated_at: string | null
           user_id: string
           votes: number
@@ -193,6 +169,7 @@ export type Database = {
           event_id?: string | null
           id?: string
           project_id?: string | null
+          reaction?: string | null
           updated_at?: string | null
           user_id: string
           votes?: number
@@ -202,6 +179,7 @@ export type Database = {
           event_id?: string | null
           id?: string
           project_id?: string | null
+          reaction?: string | null
           updated_at?: string | null
           user_id?: string
           votes?: number
@@ -243,18 +221,21 @@ export type Database = {
           id: number
           name: string | null
           project_id: string | null
+          slug: string
         }
         Insert: {
           created_at?: string
           id?: number
           name?: string | null
           project_id?: string | null
+          slug: string
         }
         Update: {
           created_at?: string
           id?: number
           name?: string | null
           project_id?: string | null
+          slug?: string
         }
         Relationships: [
           {
