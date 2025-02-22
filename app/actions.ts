@@ -49,6 +49,27 @@ export const signInAction = async (formData: FormData) => {
       .eq("id", user?.id || "")
       .single();
 
+    // Create profile if it doesn't exist
+    if (!profile && user) {
+      const { error: createError } = await supabase
+        .from("profiles")
+        .insert([
+          {
+            id: user.id,
+            email: user.email,
+            name_requested: false,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+
+      if (createError) {
+        console.error("Error creating profile:", createError);
+        return encodedRedirect("error", "/sign-in", "Failed to create profile");
+      }
+
+      return { refresh: true, url: '/username' };
+    }
+
     if (!profile?.name) {
       return { refresh: true, url: '/username' };
     }

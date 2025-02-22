@@ -29,7 +29,7 @@ export default async function UsernamePage() {
     .eq('id', user.id);
 
   return (
-    <div className="w-full flex flex-col items-center">
+    <div className="w-full flex flex-col items-center p-8">
       <div className="w-full space-y-8">
         <h1 className="font-eyebrow text-2xl text-brand-blue text-center">Choose Your Name</h1>
         <div className="flex flex-col gap-4 text-center font-eyebrow text-sm text-brand-blue">
