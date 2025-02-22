@@ -185,10 +185,10 @@ export function VoteAllocation({
                 min={0}
                 max={availableVotes + localCurrentAllocation}
                 onChange={(e) => {
-                  const value = e.target.value === '' ? 0 : parseInt(e.target.value);
-                  setAllocatingVotes(value);
+                  const value = e.target.value === '' ? undefined : parseInt(e.target.value);
+                  setAllocatingVotes(value || 0);
                 }}
-                value={allocatingVotes}
+                value={allocatingVotes || ''}
                 className="flex-1"
               />
               <span className="text-brand-blue font-eyebrow text-sm whitespace-nowrap">
