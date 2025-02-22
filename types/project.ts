@@ -5,4 +5,5 @@ export interface Project {
   total_votes?: number;
   created_at: string;
   updated_at: string;
+  event_id: string;
 }
