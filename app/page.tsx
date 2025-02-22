@@ -41,8 +41,12 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {[
               {
-                title: "Easy Email Onboarding",
-                description: "Invite users to use email or phone number, or wallet if they have one."
+                title: "Built with Allo Protocol",
+                description: "Allo is an open source protocol for democratic allocation and distribution of capital."
+              },
+              {
+                title: "Built for non-crypto nerds",
+                description: "Invite users to use email, phone number, or wallet if they have one. No crypto experience required."
               },
               {
                 title: "Transparently Composable",
@@ -53,12 +57,12 @@ export default function Home() {
                 description: "Live projection-ready dashboard perfect for events and gatherings."
               },
               {
-                title: "Physical Integration Kit",
+                title: "Physical Kit",
                 description: "NFC cards, stickers, and QR codes for physical interactions."
               },
               {
                 title: "Choose Your Funding Strategy",
-                description: "Modern funding mechanisms available now, with more coming soon."
+                description: "Basic funding mechanisms available now, with more coming soon."
               }
             ].map((feature, i) => (
               <div key={i} className="p-8 rounded-2xl bg-gray-100 hover:bg-brand-yellow/20 transition-colors">
