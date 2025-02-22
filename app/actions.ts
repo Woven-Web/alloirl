@@ -39,18 +39,44 @@ export const signInAction = async (formData: FormData) => {
       return encodedRedirect("error", "/sign-in", error.message, { email });
     }
 
+    console.log("OTP verified successfully for email:", email);
+
     const {
       data: { user },
+      error: userError,
     } = await supabase.auth.getUser();
 
-    const { data: profile } = await supabase
+    console.log("Auth getUser result:", { user, error: userError });
+
+    if (!user || userError) {
+      console.error("Failed to get user after OTP verification:", userError);
+      return encodedRedirect("error", "/sign-in", "Authentication failed");
+    }
+
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("name")
+      .select("*")
       .eq("id", user?.id || "")
       .single();
 
+    console.log("Profile query result:", { profile, error: profileError });
+
     // Create profile if it doesn't exist
     if (!profile && user) {
+      // Use admin client for allowlist operations
+      const adminClient = await createAdminClient();
+      
+      // Check if user is on any event allowlist
+      const { data: allowlistEntry, error: allowlistError } = await adminClient
+        .from("event_allowlist")
+        .select("*")
+        .eq("email", user.email?.toLowerCase())
+        .eq("has_registered", false)
+        .single();
+
+      console.log("Allowlist check for new user:", { allowlistEntry, error: allowlistError });
+
+      // Create the profile
       const { error: createError } = await supabase
         .from("profiles")
         .insert([
@@ -67,6 +93,42 @@ export const signInAction = async (formData: FormData) => {
         return encodedRedirect("error", "/sign-in", "Failed to create profile");
       }
 
+      // If user was on allowlist, create event_participants entry and update allowlist
+      if (allowlistEntry?.event_id) {
+        console.log("Creating event participant for event:", allowlistEntry.event_id);
+        
+        // Create event participant with default 10 votes
+        const { error: participantError } = await adminClient
+          .from("event_participants")
+          .insert([
+            {
+              user_id: user.id,
+              event_id: allowlistEntry.event_id,
+              available_votes: 10,
+              is_admin: false,
+            },
+          ]);
+
+        if (participantError) {
+          console.error("Error creating event participant:", participantError);
+        } else {
+          console.log("Event participant created successfully");
+        }
+
+        // Mark allowlist entry as registered
+        const { error: allowlistUpdateError } = await adminClient
+          .from("event_allowlist")
+          .update({ has_registered: true })
+          .eq("email", user.email)
+          .eq("event_id", allowlistEntry.event_id);
+
+        if (allowlistUpdateError) {
+          console.error("Error updating allowlist:", allowlistUpdateError);
+        } else {
+          console.log("Allowlist entry updated successfully");
+        }
+      }
+
       return { refresh: true, url: '/username' };
     }
 
@@ -74,7 +136,8 @@ export const signInAction = async (formData: FormData) => {
       return { refresh: true, url: '/username' };
     }
 
-    return { refresh: true, url: '/' };
+    // TODO: make this dynamic
+    return { refresh: true, url: '/events/a6dbab6b-a108-4147-ab09-0cdf0d802edb' };
   }
 
   if (!email) {
