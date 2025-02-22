@@ -96,6 +96,7 @@ export const allocateVotes = async (
   projectId: string,
   eventId: string,
   amount: number,
+  reaction?: string,
 ) => {
   const supabase = await createClient();
   const {
@@ -141,6 +142,7 @@ export const allocateVotes = async (
     p_event_id: eventId,
     p_project_id: projectId,
     p_amount: amount,
+    p_reaction: reaction,
   });
 
   if (transactionError) {

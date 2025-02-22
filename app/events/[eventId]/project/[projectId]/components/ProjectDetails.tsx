@@ -15,10 +15,13 @@ interface Allocation {
   votes: number;
   created_at: string;
   user_id: string;
+  reaction: string | null;
   profiles: {
     name: string;
   }[] | null;
 }
+
+const EMOJI_OPTIONS = ['👍', '❤️', '🎉', '🚀', '💡'] as const;
 
 export function ProjectDetails({ project }: ProjectDetailsProps) {
   const [votes, setVotes] = useState({ total: 0, unique: 0 });
@@ -38,7 +41,8 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         id,
         votes,
         created_at,
-        user_id
+        user_id,
+        reaction
       `)
       .eq("project_id", project.id)
       .gt("votes", 0)
@@ -81,6 +85,18 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
     }
   }
 
+  async function setReaction(allocationId: string, reaction: string) {
+    const client = createClient();
+    const { error } = await client
+      .from("project_allocations")
+      .update({ reaction })
+      .eq("id", allocationId);
+
+    if (!error) {
+      fetchAllocations();
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div className="space-y-4">
@@ -100,9 +116,10 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
             return (
               <div 
                 key={allocation.id} 
-                className="text-brand-blue font-eyebrow text-lg"
+                className="text-brand-blue font-eyebrow text-lg flex items-center gap-2"
               >
-                {timeAgo} ago | {allocation.profiles?.[0]?.name ?? allocation.user_id.substring(0, 6)} | {allocation.votes} votes
+                <span>{timeAgo} ago | {allocation.profiles?.[0]?.name ?? allocation.user_id.substring(0, 6)} | {allocation.votes} votes</span>
+                {allocation.reaction && <span className="text-2xl">{allocation.reaction}</span>}
               </div>
             );
           })}
