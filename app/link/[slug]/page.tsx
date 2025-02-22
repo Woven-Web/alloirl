@@ -4,10 +4,10 @@ import { redirect, notFound } from "next/navigation";
 export default async function ContactlessRedirectPage({
   params,
 }: {
-  params: Promise<{ contactlessId: string }>;
+  params: Promise<{ slug: string }>;
 }) {
   const supabase = await createClient();
-  const contactlessId = (await params).contactlessId;
+  const slug = (await params).slug;
 
   const { data, error } = await supabase
     .from("project_contactless_links")
@@ -22,7 +22,7 @@ export default async function ContactlessRedirectPage({
       )
     `,
     )
-    .eq("id", Number(contactlessId))
+    .eq("slug", slug)
     .single();
 
   if (error) {

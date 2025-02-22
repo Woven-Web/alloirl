@@ -46,7 +46,7 @@ export const signInAction = async (formData: FormData) => {
     const { data: profile } = await supabase
       .from("profiles")
       .select("name")
-      .eq("id", user?.id)
+      .eq("id", user?.id || "")
       .single();
 
     if (!profile?.name) {

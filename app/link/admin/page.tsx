@@ -8,10 +8,21 @@ import NewLinkForm from "./components/NewLinkForm";
 export default async function AdminDashboard() {
   const supabase = await createClient();
 
-  const { data: projects } = await supabase.from("projects").select(`
-    id,
-    name
-  `);
+  const { data: projects } = await supabase
+    .from("projects")
+    .select(`
+      id,
+      name,
+      description,
+      created_at,
+      metadata,
+      project_contactless_links (
+        id,
+        name,
+        slug,
+        created_at
+      )
+    `);
 
   return (
     <div className="p-4 max-w-4xl mx-auto space-y-8">
