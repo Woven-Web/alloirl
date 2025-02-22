@@ -94,15 +94,8 @@ export default function Home() {
           Built by{' '}
           <a href="https://wovenweb.org" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">
             Woven Web
-          </a>
-          {' • '}
-          <a href="https://x.com/jondotbo" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">
-            Jon Bo
-          </a>
-          {' • '}
-          <a href="https://x.com/UnforcedAG" target="_blank" rel="noopener noreferrer" className="text-brand-blue hover:underline">
-            Aaron Gabriel
-          </a>
+          </a>{" "}
+          & amazing contributors
         </div>
       </footer>
     </main>
