@@ -188,12 +188,12 @@ export default async function EventPage({
               <Link 
                 key={project.id} 
                 href={`/events/${eventId}/project/${project.id}`} 
-                className="flex justify-between items-center text-brand-blue font-eyebrow text-xl hover:opacity-80 py-2"
+                className="flex flex-col sm:flex-row sm:justify-between gap-2 text-brand-blue font-eyebrow text-xl hover:opacity-80 py-2"
               >
-                <span>{project.name}</span>
-                <div className="flex items-center gap-4">
-                  <span className="text-lg">{project.total_votes} votes</span>
-                  <span className="text-lg text-green-600">~${Math.round(project.matching_amount)}</span>
+                <span className="break-words">{project.name}</span>
+                <div className="flex items-center gap-4 shrink-0">
+                  <span className="text-lg whitespace-nowrap">{project.total_votes} votes</span>
+                  <span className="text-lg text-green-600 whitespace-nowrap">~${Math.round(project.matching_amount)}</span>
                 </div>
               </Link>
             ))}

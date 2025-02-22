@@ -165,9 +165,8 @@ export function VoteAllocation({
 
       <div className="mt-8 pb-8">
         <div className="flex justify-between items-center mb-4">
-          <span className="text-brand-blue font-eyebrow text-lg">allocate</span>
-          <div className="flex flex-col items-end">
-            <span className="text-brand-blue font-eyebrow text-sm">
+          <div className="flex flex-col items-end w-full">
+            <span className="text-brand-blue font-eyebrow text-sm right-0">
               {availableVotes} available
             </span>
             {/* <span className="text-brand-blue/60 font-eyebrow text-xs">

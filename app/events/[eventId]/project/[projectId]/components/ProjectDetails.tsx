@@ -2,6 +2,8 @@
 
 import { Project } from "@/types/project";
 import { createClient } from "@/utils/supabase/client";
+import { ArrowLeftIcon } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 interface ProjectDetailsProps {
@@ -82,6 +84,10 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
   return (
     <div className="space-y-8">
       <div className="space-y-4">
+        <Link href={`/events/${project.event_id}`} className="flex items-center gap-2 text-brand-blue font-eyebrow text-lg pb-4">
+          <ArrowLeftIcon className="w-4 h-4" />
+          all projects
+        </Link>
         <h1 className="text-brand-blue font-title text-4xl">{project.name}</h1>
         <p className="text-brand-blue font-eyebrow text-xl">{votes.total} Votes</p>
       </div>
