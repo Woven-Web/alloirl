@@ -49,7 +49,7 @@ export default function Home() {
                 description: "Secure and transparent verification under the hood, powered by Ethereum Attestations."
               },
               {
-                title: "Real-time Dashboard",
+                title: "Realtime Dashboard",
                 description: "Live projection-ready dashboard perfect for events and gatherings."
               },
               {
