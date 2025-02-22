@@ -9,6 +9,9 @@ import toast from 'react-hot-toast';
 import Link from "next/link";
 // import { useToast } from "@/components/ui/use-toast";
 
+const EMOJI_OPTIONS = ['👍', '❤️', '🎉', '🚀', '💡'] as const;
+type EmojiOption = typeof EMOJI_OPTIONS[number];
+
 interface EventParticipant {
   id: string;
   user_id: string;
@@ -39,6 +42,7 @@ export function VoteAllocation({
   onVoteSuccess,
 }: VoteAllocationProps) {
   const [allocatingVotes, setAllocatingVotes] = useState(currentAllocation || 0);
+  const [selectedEmoji, setSelectedEmoji] = useState<EmojiOption | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [localParticipantData, setLocalParticipantData] = useState(participantData);
   const [localCurrentAllocation, setLocalCurrentAllocation] = useState(currentAllocation);
@@ -138,7 +142,7 @@ export function VoteAllocation({
   const submitAllocation = async () => {
     try {
       setIsSubmitting(true);
-      const result = await allocateVotes(projectId, eventId, allocatingVotes);
+      const result = await allocateVotes(projectId, eventId, allocatingVotes, selectedEmoji || undefined);
       if (result.success) {
         toast.success(result.message);
         window.location.reload();
@@ -175,25 +179,48 @@ export function VoteAllocation({
             </span>
           </div>
         </div>
-        <div className="flex gap-4">
-          <div className="flex-1 flex items-center gap-2">
-            <NumberInput
-              min={0}
-              max={availableVotes + localCurrentAllocation}
-              onChange={(e) => {
-                const value = e.target.value === '' ? 0 : parseInt(e.target.value);
-                setAllocatingVotes(value);
-              }}
-              value={allocatingVotes}
-              className="flex-1"
-            />
-            <span className="text-brand-blue font-eyebrow text-sm whitespace-nowrap">
-              / {voteLimit}
-            </span>
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex-1 flex items-center gap-2">
+              <NumberInput
+                min={0}
+                max={availableVotes + localCurrentAllocation}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+                  setAllocatingVotes(value);
+                }}
+                value={allocatingVotes}
+                className="flex-1"
+              />
+              <span className="text-brand-blue font-eyebrow text-sm whitespace-nowrap">
+                / {voteLimit}
+              </span>
+            </div>
           </div>
+          
+          <div className="flex flex-col gap-2">
+            <span className="text-brand-blue font-eyebrow text-sm">Choose a reaction (optional)</span>
+            <div className="flex gap-2">
+              {EMOJI_OPTIONS.map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => setSelectedEmoji(emoji === selectedEmoji ? null : emoji)}
+                  className={`text-2xl p-2 rounded-lg transition-all ${
+                    emoji === selectedEmoji 
+                      ? 'bg-brand-blue/10 scale-110' 
+                      : 'hover:bg-brand-blue/5'
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <PrimaryButton 
             onClick={submitAllocation} 
             disabled={isSubmitting || allocatingVotes === localCurrentAllocation}
+            className="w-full"
           >
             {isSubmitting ? "Allocating..." : "Allocate"}
           </PrimaryButton>
