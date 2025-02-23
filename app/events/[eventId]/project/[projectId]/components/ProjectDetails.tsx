@@ -105,7 +105,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
           all projects
         </Link>
         <h1 className="text-brand-blue font-title text-4xl">{project.name}</h1>
-        <p className="text-brand-blue font-eyebrow text-xl">{votes.total} Votes</p>
+        <p className="text-brand-blue font-eyebrow text-xl">{votes.total} Total Votes</p>
       </div>
 
       <div className="space-y-4">
