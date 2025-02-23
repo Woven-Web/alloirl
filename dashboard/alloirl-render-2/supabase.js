@@ -114,8 +114,14 @@ export async function fetchEventData(eventId) {
             }).then(res => res.json())
         ]);
 
+        console.log('Raw matchingData:', matchingData);
+        
+        // Ensure matchingData is properly structured
+        const matchingResults = matchingData.results || [];
+        console.log('Processed matchingData:', matchingResults);
+
         // Transform participants into attendees format
-        console.log({profiles})
+        console.log('Profiles:', profiles);
         const attendees = participants.map((participant, index) => ({
             id: participant.user_id,
             displayId: profiles.find(p => p.id === participant.user_id)?.name || participant.user_id.substring(0, 8),
@@ -126,7 +132,7 @@ export async function fetchEventData(eventId) {
 
         // Transform projects into required format and sort by matching amount
         const transformedProjects = projects.map((project, index) => {
-            const matchingInfo = matchingData.find(m => m.project_id === project.id) || {
+            const matchingInfo = matchingResults.find(m => m.project_id === project.id) || {
                 matching_amount: 0,
                 contribution_amount: 0,
                 number_contributions: 0
@@ -142,7 +148,8 @@ export async function fetchEventData(eventId) {
             };
         })
         .filter(project => project.matchingAmount > 0) // Filter out projects with no matching amount
-        .sort((a, b) => b.matchingAmount - a.matchingAmount); // Sort by matching amount descending
+        .sort((a, b) => b.matchingAmount - a.matchingAmount) // Sort by matching amount descending
+        .slice(0, 5); // Only take top 5 projects
 
         // Generate time slots (using existing CONFIG from script.js)
         const timeSlots = generateTimeSlots();
