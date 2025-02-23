@@ -206,6 +206,8 @@ export const allocateVotes = async (
     data: { user },
   } = await supabase.auth.getUser();
 
+  throw new Error("Voting period has ended");
+
   if (!user) {
     throw new Error("You must be signed in to vote");
   }
