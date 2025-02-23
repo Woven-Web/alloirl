@@ -104,7 +104,7 @@ export const signInAction = async (formData: FormData) => {
             {
               user_id: user.id,
               event_id: allowlistEntry.event_id,
-              available_votes: 69,
+              available_votes: 100,
               is_admin: false,
             },
           ]);

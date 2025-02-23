@@ -132,8 +132,11 @@ function calculateMatching(
 }
 
 export async function POST(request: Request) {
+  console.time('total-matching-calculation');
   try {
+    console.time('request-parsing');
     const { eventId } = await request.json();
+    console.timeEnd('request-parsing');
     
     if (!eventId) {
       return NextResponse.json(
@@ -145,11 +148,13 @@ export async function POST(request: Request) {
     const supabase = await createClient();
 
     // Get all allocations for this event
+    console.time('db-fetch');
     const { data: allocations, error } = await supabase
       .from('project_allocations')
       .select('project_id, user_id, votes')
       .eq('event_id', eventId)
       .gt('votes', 0);
+    console.timeEnd('db-fetch');
 
     if (error) {
       return NextResponse.json(
@@ -166,15 +171,30 @@ export async function POST(request: Request) {
     }
 
     // Aggregate votes
+    console.time('vote-aggregation');
     const voteDict = aggregateVotes(allocations);
+    console.timeEnd('vote-aggregation');
     
     // Calculate pair totals
+    console.time('pair-totals');
     const pairTotals = getTotalsByPair(voteDict);
+    console.timeEnd('pair-totals');
     
     // Calculate matching amounts
+    console.time('matching-calculation');
     const results = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
+    console.timeEnd('matching-calculation');
 
-    return NextResponse.json(results, { headers: corsHeaders });
+    console.timeEnd('total-matching-calculation');
+    
+    // Add timing metadata to response
+    return NextResponse.json({
+      results,
+      metadata: {
+        total_allocations: allocations.length,
+        total_projects: Object.keys(voteDict).length,
+      }
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('Error calculating matching amounts:', error);
     return NextResponse.json(
