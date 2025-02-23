@@ -3,8 +3,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { CONFIG } from './script.js';
 
 // Initialize Supabase client
-const supabaseUrl = 'https://uxylrdyyuidugrbbkurv.supabase.co'; // Replace with your actual URL
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4eWxyZHl5dWlkdWdyYmJrdXJ2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjM3MjY0MSwiZXhwIjoyMDUxOTQ4NjQxfQ.IMYYavm93SOK6cNa4V_is8MROrXZ-X610crXaEGan-8'; // Replace with your actual key
+const supabaseUrl = 'https://fudpimvsuddwhpbalpgy.supabase.co'; // Replace with your actual URL
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZHBpbXZzdWRkd2hwYmFscGd5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDI3NjAzNywiZXhwIjoyMDU1ODUyMDM3fQ.JjokWUheGRzs5_ggnAfab1ss3myQ0NUbtmH6ByWqbJk'; // Replace with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initialize JSConfetti
