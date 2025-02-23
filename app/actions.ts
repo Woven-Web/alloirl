@@ -136,6 +136,12 @@ export const signInAction = async (formData: FormData) => {
       return { refresh: true, url: '/username' };
     }
 
+    // Use returnTo URL if provided, otherwise fallback to default
+    const returnTo = formData.get("returnTo") as string;
+    if (returnTo) {
+      return { refresh: true, url: decodeURIComponent(returnTo) };
+    }
+
     // TODO: make this dynamic
     return { refresh: true, url: '/events/a6dbab6b-a108-4147-ab09-0cdf0d802edb' };
   }
@@ -163,11 +169,21 @@ export const signInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-in", error.message);
   }
 
+  // Preserve returnTo parameter when redirecting back for OTP
+  const returnTo = formData.get("returnTo") as string;
+  const additionalParams: Record<string, string | boolean | number> = {
+    otpSent: 1,
+    email,
+  };
+  if (returnTo) {
+    additionalParams.returnTo = returnTo;
+  }
+
   return encodedRedirect(
     "success",
     "/sign-in",
     "Check your email for your OTP code.",
-    { otpSent: 1, email },
+    additionalParams
   );
 };
 

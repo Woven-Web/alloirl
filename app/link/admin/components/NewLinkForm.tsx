@@ -27,11 +27,13 @@ const NewLinkForm = ({ projects }: NewLinkFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log("handleSubmit", name, slug, projectId);
     e.preventDefault();
-    if (!name || !slug || !projectId) return;
+    if (!slug || !projectId) return;
 
     setIsSubmitting(true);
     try {
+      console.log("Creating link", name, slug, projectId);
       const { error } = await supabase.from("project_contactless_links").insert({
         name,
         slug,
@@ -89,7 +91,7 @@ const NewLinkForm = ({ projects }: NewLinkFormProps) => {
           className="block w-full rounded-md border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500 focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
           placeholder="e.g. my-cool-link"
           required
-          pattern="[a-z0-9-]+"
+          pattern="[a-z0-9]+"
           title="Lowercase letters, numbers, and hyphens only"
         />
       </div>
@@ -125,7 +127,7 @@ const NewLinkForm = ({ projects }: NewLinkFormProps) => {
 
       <button
         type="submit"
-        disabled={isSubmitting || !name || !slug || !projectId}
+        disabled={isSubmitting || !slug || !projectId}
         className="inline-flex items-center justify-center rounded-md bg-brand-blue px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-blue/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting ? "Creating..." : "Create Link"}

@@ -50,6 +50,10 @@ export default function Login() {
           if (code) {
             formData.append("code", code);
           }
+          const returnTo = params.get("returnTo");
+          if (returnTo) {
+            formData.append("returnTo", returnTo);
+          }
           const result = await signInAction(formData) as SignInResponse;
           if (result?.refresh) {
             window.location.href = result.url || '/';
