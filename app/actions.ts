@@ -271,7 +271,7 @@ export const allocateVotes = async (
   }
 
   // Begin transaction
-  const { error: transactionError } = await supabase.rpc('allocate_votes', {
+  const { error: transactionError } = await supabase.rpc('allocate_votes_2', {
     p_event_id: eventId,
     p_project_id: projectId,
     p_amount: amount,
