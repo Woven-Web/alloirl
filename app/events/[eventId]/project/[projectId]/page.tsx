@@ -69,7 +69,7 @@ export default async function ProjectPage({
       </div>
       
       {user && (
-        <div className="fixed bottom-0 left-0 right-0 px-4 pb-[env(safe-area-inset-bottom)]">
+        <div className="bg-white fixed bottom-0 left-0 right-0 px-4 pb-[env(safe-area-inset-bottom)] border-t border-blue-500">
           <VoteAllocation 
             eventId={eventId}
             projectId={projectId}
