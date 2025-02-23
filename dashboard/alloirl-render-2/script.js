@@ -15,18 +15,18 @@ export const CONFIG = {
     project: {
         width: 200,
         height: 60,
-        spacing: 20,
+        spacing: 12,  // Reduced from 20 to 12
         cornerRadius: 4,
         style: {
             display: "flex",
             alignItems: "center",
-            marginBottom: "20px"
+            marginBottom: "12px"  // Added to match spacing
         }
     },
     time: {
         interval: 15,     // minutes between time slots
-        eventDuration: 6, // duration in hours
-        startHour: 13, // 24h format
+        eventDuration: 5, // duration in hours
+        startHour: 17, // 24h format
         format: (time) => {
             // Custom format to show "10 PM", "11 PM", etc.
             const hours = time.getHours();
@@ -254,7 +254,8 @@ function drawProjects(projects) {
 
     // Add header section with single-line layout
     const headers = projectDivs.append("div")
-        .attr("class", "project-header");
+        .attr("class", "project-header")
+        .style("padding", "8px 12px");  // Slightly reduced padding
     
     const headerLeft = headers.append("div")
         .attr("class", "project-header-left")
@@ -275,7 +276,9 @@ function drawProjects(projects) {
     
     content.append("div")
         .attr("class", "project-name")
-        .text(d => d.name);
+        .text(d => d.name)
+        .style("font-size", d => d.name.length > 15 ? "24px" : "32px") // Reduce font size for longer names
+        .style("line-height", d => d.name.length > 15 ? "1.2" : "1.4"); // Adjust line height accordingly
     
     const projectPath = content.append("div")
         .attr("class", "project-path")

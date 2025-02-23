@@ -127,7 +127,7 @@ export function VoteAllocation({
 
   // Get available votes and vote limit
   const availableVotes = localParticipantData?.available_votes || 0;
-  const voteLimit = localParticipantData?.events?.vote_limit || 60; // Default to 60 if not set
+  const voteLimit = localParticipantData?.events?.vote_limit || 100; // Default to 60 if not set
 
   // Debug current state
   useEffect(() => {

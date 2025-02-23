@@ -171,7 +171,7 @@ export default function AdminDashboard() {
         .insert({
           user_id: selectedUserId,
           event_id: eventId,
-          available_votes: 0,
+          available_votes: 100,
           is_admin: false
         });
 
