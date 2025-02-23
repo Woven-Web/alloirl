@@ -200,11 +200,11 @@ export const allocateVotes = async (
   amount: number,
   reaction?: string,
 ) => {
-  const supabase = await createClient();
-  const adminClient = await createAdminClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // const supabase = await createClient();
+  // const adminClient = await createAdminClient();
+  // const {
+  //   data: { user },
+  // } = await supabase.auth.getUser();
 
   throw new Error("Voting period has ended");
 
