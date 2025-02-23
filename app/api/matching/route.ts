@@ -174,7 +174,14 @@ export async function POST(request: Request) {
     // Calculate matching amounts
     const results = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
 
-    return NextResponse.json(results, { headers: corsHeaders });
+    // Add timing metadata to response
+    return NextResponse.json({
+      results,
+      metadata: {
+        total_allocations: allocations.length,
+        total_projects: Object.keys(voteDict).length,
+      }
+    }, { headers: corsHeaders });
   } catch (error) {
     console.error('Error calculating matching amounts:', error);
     return NextResponse.json(

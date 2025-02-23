@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/utils/supabase/serverAdmin";
+import { createVoteAllocationAttestation } from "@/utils/eas";
 
 const encodedRedirect = (
   type: "success" | "error",
@@ -104,7 +105,7 @@ export const signInAction = async (formData: FormData) => {
             {
               user_id: user.id,
               event_id: allowlistEntry.event_id,
-              available_votes: 69,
+              available_votes: 100,
               is_admin: false,
             },
           ]);
@@ -200,6 +201,7 @@ export const allocateVotes = async (
   reaction?: string,
 ) => {
   const supabase = await createClient();
+  const adminClient = await createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -208,16 +210,46 @@ export const allocateVotes = async (
     throw new Error("You must be signed in to vote");
   }
 
-  // Get current event participant
-  const { data: eventParticipant, error: participantError } = await supabase
+  console.log("Checking participation for:", { userId: user.id, eventId });
+
+  // Use admin client to bypass RLS and check if user is actually a participant
+  const { data: eventParticipant, error: participantError } = await adminClient
     .from("event_participants")
     .select("*")
     .eq("user_id", user.id)
     .eq("event_id", eventId)
     .single();
 
+  console.log("Admin participant query:", { eventParticipant, participantError });
+
   if (participantError || !eventParticipant) {
+    console.error("Participation check failed:", { participantError, eventParticipant });
     throw new Error("You are not a participant in this event");
+  }
+
+  // Get current event participant and their profile
+  const [
+    { data: profile },
+    { data: project }
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("name")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("projects")
+      .select("name")
+      .eq("id", projectId)
+      .single()
+  ]);
+
+  if (!profile?.name) {
+    throw new Error("Profile name not found");
+  }
+
+  if (!project?.name) {
+    throw new Error("Project not found");
   }
 
   // Get current allocation if it exists
@@ -250,10 +282,70 @@ export const allocateVotes = async (
     throw new Error("Failed to allocate votes: " + transactionError.message);
   }
 
-  return {
-    success: true,
-    message: `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}`,
-  };
+  try {
+    // Create EAS attestation asynchronously
+    const { transactionHash, status, error } = await createVoteAllocationAttestation({
+      eventId,
+      projectId,
+      projectTitle: project.name,
+      amount,
+      voterId: user.id,
+      username: profile.name,
+    });
+
+    // Get the most recent transaction
+    const { data: transaction } = await supabase
+      .from("transactions")
+      .select("id")
+      .eq("event_id", eventId)
+      .eq("project_id", projectId)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (transaction) {
+      // Update with the transaction hash and status
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ 
+          transaction_hash: transactionHash,
+          attestation_status: status,
+          attestation_error: error
+        })
+        .eq("id", transaction.id);
+
+      if (updateError) {
+        console.error("Failed to update transaction:", updateError);
+      }
+    }
+
+    if (error) {
+      console.warn("Attestation created with error:", error);
+      return {
+        success: true,
+        message: `Allocated ${amount} vote${amount === 1 ? "" : "s"}, but there was an issue with the attestation: ${error}`,
+        transactionHash,
+        status,
+      };
+    }
+
+    return {
+      success: true,
+      message: `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}`,
+      transactionHash,
+      status,
+    };
+  } catch (error) {
+    console.error("Failed to create attestation:", error);
+    // Note: We don't throw here because the vote allocation was successful
+    // The attestation is a nice-to-have but not critical for the user experience
+    return {
+      success: true,
+      message: `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}, but attestation failed`,
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
+  }
 };
 
 export const importGitcoinRound = async (url: string, checkOnly = false) => {

@@ -17,6 +17,7 @@ interface Allocation {
   projects: {
     id: string;
     name: string;
+    event_id: string;
   };
 }
 
@@ -60,7 +61,8 @@ export default function ProfilePage() {
           created_at,
           projects (
             id,
-            name
+            name,
+            event_id
           )
         `)
         .eq('user_id', user.id)
@@ -120,7 +122,7 @@ export default function ProfilePage() {
       </div>
 
       <section className="space-y-4">
-        <h2 className="text-brand-blue font-eyebrow text-2xl">Recent Allocations</h2>
+        <h2 className="text-brand-blue font-eyebrow text-2xl">My Allocations</h2>
         <div className="space-y-2">
           {allocations.map((allocation) => {
             const timeAgo = getTimeAgo(new Date(allocation.created_at));
@@ -129,7 +131,7 @@ export default function ProfilePage() {
                 key={allocation.id} 
                 className="text-brand-blue font-eyebrow text-lg"
               >
-                {timeAgo} | {allocation.projects.name} | {allocation.votes}
+                <Link href={`/events/${allocation.projects.event_id}/project/${allocation.projects.id}`} className="hover:underline">{allocation.projects.name}</Link> | {allocation.votes} {allocation.votes === 1 ? 'vote' : 'votes'}
               </div>
             );
           })}

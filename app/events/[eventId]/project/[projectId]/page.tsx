@@ -9,55 +9,58 @@ export default async function ProjectPage({
 }: {
   params: Promise<{ eventId: string; projectId: string }>
 }) {
+  const startTime = Date.now();
+  console.log('Starting project page load');
+
   const { eventId, projectId } = await params;
   const supabase = await createClient();
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Get project
-  const { data: project } = await supabase
-    .from("projects")
-    .select("*")
-    .eq("id", projectId)
-    .single();
+  // Run all independent queries in parallel
+  const [
+    { data: { user } },
+    { data: project },
+    { data: projectVotes }
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from("projects").select("*").eq("id", projectId).single(),
+    supabase.from("project_allocations").select("votes").eq("event_id", eventId).eq("project_id", projectId)
+  ]);
 
   if (!project) {
     notFound();
   }
 
-  // Get participant data if user is logged in
-  const { data: participantData } = user ? await supabase
-    .from("event_participants")
-    .select(`
-      *,
-      events (
-        id,
-        name,
-        vote_limit
-      )
-    `)
-    .eq("event_id", eventId)
-    .eq("user_id", user.id)
-    .single() : { data: null };
-
-  // Get current allocation for this project
-  const { data: currentAllocation } = user ? await supabase
-    .from("project_allocations")
-    .select("votes")
-    .eq("event_id", eventId)
-    .eq("project_id", projectId)
-    .eq("user_id", user.id)
-    .single() : { data: null };
-
-  // Get total votes for this project
-  const { data: projectVotes } = await supabase
-    .from("project_allocations")
-    .select("votes")
-    .eq("event_id", eventId)
-    .eq("project_id", projectId);
+  // These queries depend on user, so they need to run after we have user data
+  const [
+    { data: participantData },
+    { data: currentAllocation }
+  ] = user ? await Promise.all([
+    supabase
+      .from("event_participants")
+      .select(`
+        *,
+        events (
+          id,
+          name,
+          vote_limit
+        )
+      `)
+      .eq("event_id", eventId)
+      .eq("user_id", user.id)
+      .single(),
+    supabase
+      .from("project_allocations")
+      .select("votes")
+      .eq("event_id", eventId)
+      .eq("project_id", projectId)
+      .eq("user_id", user.id)
+      .single()
+  ]) : [{ data: null }, { data: null }];
 
   const totalVotes = projectVotes?.reduce((sum, allocation) => sum + allocation.votes, 0) || 0;
+
+  const totalTime = Date.now() - startTime;
+  console.log(`Total page load time: ${totalTime}ms`);
 
   return (
     <div className="h-[calc(100vh-4rem)] relative">

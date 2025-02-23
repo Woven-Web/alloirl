@@ -107,24 +107,30 @@ export default async function EventPage({
 }: {
   params: Promise<{ eventId: string }>
 }) {
+  const startTime = Date.now();
+  console.log('Starting event page load');
+  
   const supabase = await createClient();
   const eventId = (await params).eventId;
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Fetch event details
-  const { data: event } = await supabase
-    .from("events")
-    .select("*")
-    .eq("id", eventId)
-    .single();
+  // Run all independent queries in parallel
+  const [
+    { data: { user } },
+    { data: event },
+    { data: allocations },
+    { data: projects }
+  ] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.from("events").select("*").eq("id", eventId).single(),
+    supabase.from('project_allocations').select('project_id, user_id, votes').eq('event_id', eventId).gt('votes', 0),
+    supabase.from("projects").select('*, project_allocations(votes)').eq("event_id", eventId)
+  ]);
 
   if (!event) {
     notFound();
   }
 
-  // Check if user is an admin
+  // Check if user is an admin - this needs to wait for user
   const { data: participant } = user ? await supabase
     .from('event_participants')
     .select('is_admin')
@@ -134,27 +140,11 @@ export default async function EventPage({
 
   const isAdmin = participant?.is_admin ?? false;
 
-  // Fetch all allocations for matching calculation
-  const { data: allocations } = await supabase
-    .from('project_allocations')
-    .select('project_id, user_id, votes')
-    .eq('event_id', eventId)
-    .gt('votes', 0);
-
   // Calculate matching amounts
   const voteDict = aggregateVotes(allocations || []);
   const pairTotals = getTotalsByPair(voteDict);
   const matchingResults = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
   const matchingMap = new Map(matchingResults.map(result => [result.project_id, result]));
-
-  // Fetch projects associated with this event
-  const { data: projects } = await supabase
-    .from("projects")
-    .select(`
-      *,
-      project_allocations(votes)
-    `)
-    .eq("event_id", eventId);
 
   // Calculate total votes for each project and sort by votes
   const projectsWithVotes = projects?.map(project => ({
@@ -164,6 +154,9 @@ export default async function EventPage({
     matching_amount: matchingMap.get(project.id)?.matching_amount || 0
   }))
   .sort((a, b) => b.total_votes - a.total_votes);
+
+  const totalTime = Date.now() - startTime;
+  console.log(`Total page load time: ${totalTime}ms`);
 
   return (
     <div className="flex flex-col w-full px-4 space-y-8">
