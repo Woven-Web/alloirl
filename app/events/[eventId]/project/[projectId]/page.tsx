@@ -15,7 +15,7 @@ export default async function ProjectPage({
   const { eventId, projectId } = await params;
   const supabase = await createClient();
 
-  console.time('parallel-fetches');
+  console.time('project-page-parallel-fetches');
   // Run all independent queries in parallel
   const [
     { data: { user } },
@@ -26,14 +26,14 @@ export default async function ProjectPage({
     supabase.from("projects").select("*").eq("id", projectId).single(),
     supabase.from("project_allocations").select("votes").eq("event_id", eventId).eq("project_id", projectId)
   ]);
-  console.timeEnd('parallel-fetches');
+  console.timeEnd('project-page-parallel-fetches');
 
   if (!project) {
     notFound();
   }
 
   // These queries depend on user, so they need to run after we have user data
-  console.time('user-dependent-fetches');
+  console.time('project-page-user-dependent-fetches');
   const [
     { data: participantData },
     { data: currentAllocation }
@@ -59,11 +59,11 @@ export default async function ProjectPage({
       .eq("user_id", user.id)
       .single()
   ]) : [{ data: null }, { data: null }];
-  console.timeEnd('user-dependent-fetches');
+  console.timeEnd('project-page-user-dependent-fetches');
 
-  console.time('vote-calculation');
+  console.time('project-page-vote-calculation');
   const totalVotes = projectVotes?.reduce((sum, allocation) => sum + allocation.votes, 0) || 0;
-  console.timeEnd('vote-calculation');
+  console.timeEnd('project-page-vote-calculation');
 
   const totalTime = Date.now() - startTime;
   console.log(`Total page load time: ${totalTime}ms`);

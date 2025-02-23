@@ -1,12 +1,14 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { LoggedInCallout } from './components/logged-in-callout'
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-white to-brand-yellow/10">
       {/* Hero Section */}
-      <section className="container px-4 pt-20 pb-32 mx-auto">
+      <section className="container px-4 pt-10 pb-32 mx-auto">
         <div className="max-w-4xl mx-auto text-center">
+          <LoggedInCallout />
           <h1 className="text-6xl md:text-7xl font-display text-brand-blue mb-6">
             Where IRL meets web3
           </h1>

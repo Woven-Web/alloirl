@@ -113,7 +113,7 @@ export default async function EventPage({
   const supabase = await createClient();
   const eventId = (await params).eventId;
 
-  console.time('parallel-fetches');
+  console.time('event-page-parallel-fetches');
   // Run all independent queries in parallel
   const [
     { data: { user } },
@@ -126,34 +126,34 @@ export default async function EventPage({
     supabase.from('project_allocations').select('project_id, user_id, votes').eq('event_id', eventId).gt('votes', 0),
     supabase.from("projects").select('*, project_allocations(votes)').eq("event_id", eventId)
   ]);
-  console.timeEnd('parallel-fetches');
+  console.timeEnd('event-page-parallel-fetches');
 
   if (!event) {
     notFound();
   }
 
   // Check if user is an admin - this needs to wait for user
-  console.time('admin-check');
+  console.time('event-page-admin-check');
   const { data: participant } = user ? await supabase
     .from('event_participants')
     .select('is_admin')
     .eq('user_id', user.id)
     .eq('event_id', eventId)
     .single() : { data: null };
-  console.timeEnd('admin-check');
+  console.timeEnd('event-page-admin-check');
 
   const isAdmin = participant?.is_admin ?? false;
 
   // Calculate matching amounts
-  console.time('matching-calculations');
+  console.time('event-page-matching-calculations');
   const voteDict = aggregateVotes(allocations || []);
   const pairTotals = getTotalsByPair(voteDict);
   const matchingResults = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
   const matchingMap = new Map(matchingResults.map(result => [result.project_id, result]));
-  console.timeEnd('matching-calculations');
+  console.timeEnd('event-page-matching-calculations');
 
   // Calculate total votes for each project and sort by votes
-  console.time('project-processing');
+  console.time('event-page-project-processing');
   const projectsWithVotes = projects?.map(project => ({
     ...project,
     total_votes: project.project_allocations?.reduce((sum: number, allocation: { votes: number | null }) => 
@@ -161,7 +161,7 @@ export default async function EventPage({
     matching_amount: matchingMap.get(project.id)?.matching_amount || 0
   }))
   .sort((a, b) => b.total_votes - a.total_votes);
-  console.timeEnd('project-processing');
+  console.timeEnd('event-page-project-processing');
 
   const totalTime = Date.now() - startTime;
   console.log(`Total page load time: ${totalTime}ms`);

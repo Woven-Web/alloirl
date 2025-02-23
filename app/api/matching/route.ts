@@ -132,11 +132,11 @@ function calculateMatching(
 }
 
 export async function POST(request: Request) {
-  console.time('total-matching-calculation');
+  console.time('matching-api-total-calculation');
   try {
-    console.time('request-parsing');
+    console.time('matching-api-request-parsing');
     const { eventId } = await request.json();
-    console.timeEnd('request-parsing');
+    console.timeEnd('matching-api-request-parsing');
     
     if (!eventId) {
       return NextResponse.json(
@@ -148,13 +148,13 @@ export async function POST(request: Request) {
     const supabase = await createClient();
 
     // Get all allocations for this event
-    console.time('db-fetch');
+    console.time('matching-api-db-fetch');
     const { data: allocations, error } = await supabase
       .from('project_allocations')
       .select('project_id, user_id, votes')
       .eq('event_id', eventId)
       .gt('votes', 0);
-    console.timeEnd('db-fetch');
+    console.timeEnd('matching-api-db-fetch');
 
     if (error) {
       return NextResponse.json(
@@ -171,21 +171,21 @@ export async function POST(request: Request) {
     }
 
     // Aggregate votes
-    console.time('vote-aggregation');
+    console.time('matching-api-vote-aggregation');
     const voteDict = aggregateVotes(allocations);
-    console.timeEnd('vote-aggregation');
+    console.timeEnd('matching-api-vote-aggregation');
     
     // Calculate pair totals
-    console.time('pair-totals');
+    console.time('matching-api-pair-totals');
     const pairTotals = getTotalsByPair(voteDict);
-    console.timeEnd('pair-totals');
+    console.timeEnd('matching-api-pair-totals');
     
     // Calculate matching amounts
-    console.time('matching-calculation');
+    console.time('matching-api-calculation');
     const results = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
-    console.timeEnd('matching-calculation');
+    console.timeEnd('matching-api-calculation');
 
-    console.timeEnd('total-matching-calculation');
+    console.timeEnd('matching-api-total-calculation');
     
     // Add timing metadata to response
     return NextResponse.json({
