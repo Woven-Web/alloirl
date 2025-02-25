@@ -106,7 +106,6 @@ export const signInAction = async (formData: FormData) => {
               user_id: user.id,
               event_id: allowlistEntry.event_id,
               available_votes: 100,
-              is_admin: false,
             },
           ]);
 
@@ -201,7 +200,6 @@ export const allocateVotes = async (
   reaction?: string,
 ) => {
   const supabase = await createClient();
-  const adminClient = await createAdminClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -226,27 +224,10 @@ export const allocateVotes = async (
     throw new Error("Voting is not currently active for this event");
   }
 
-  console.log("Checking participation for:", { userId: user.id, eventId });
-
-  // Use admin client to bypass RLS and check if user is actually a participant
-  const { data: eventParticipant, error: participantError } = await adminClient
-    .from("event_participants")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("event_id", eventId)
-    .single();
-
-  console.log("Admin participant query:", { eventParticipant, participantError });
-
-  if (participantError || !eventParticipant) {
-    console.error("Participation check failed:", { participantError, eventParticipant });
-    throw new Error("You are not a participant in this event");
-  }
-
-  // Get current event participant and their profile
+  // Get project and profile info for attestation
   const [
-    { data: profile },
-    { data: project }
+    { data: profile, error: profileError },
+    { data: project, error: projectError }
   ] = await Promise.all([
     supabase
       .from("profiles")
@@ -260,34 +241,16 @@ export const allocateVotes = async (
       .single()
   ]);
 
-  if (!profile?.name) {
-    throw new Error("Profile name not found");
+  if (profileError || !profile?.name) {
+    throw new Error("Profile not found");
   }
 
-  if (!project?.name) {
+  if (projectError || !project?.name) {
     throw new Error("Project not found");
   }
 
-  // Get current allocation if it exists
-  const { data: currentAllocation } = await supabase
-    .from("project_allocations")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("project_id", projectId)
-    .eq("event_id", eventId)
-    .single();
-
-  // Calculate the vote difference
-  const currentVotes = currentAllocation?.votes || 0;
-  const voteDifference = amount - currentVotes;
-
-  // Check if they have enough votes
-  if (eventParticipant.available_votes < voteDifference) {
-    throw new Error("You don't have enough votes");
-  }
-
-  // Begin transaction
-  const { error: transactionError } = await supabase.rpc('allocate_votes_2', {
+  // Call the Supabase function to handle the transaction
+  const { data, error: transactionError } = await supabase.rpc('allocate_votes_2', {
     p_event_id: eventId,
     p_project_id: projectId,
     p_amount: amount,
@@ -322,7 +285,7 @@ export const allocateVotes = async (
 
     if (transaction) {
       // Update with the transaction hash and status
-      const { error: updateError } = await supabase
+      await supabase
         .from("transactions")
         .update({ 
           transaction_hash: transactionHash,
@@ -330,10 +293,6 @@ export const allocateVotes = async (
           attestation_error: error
         })
         .eq("id", transaction.id);
-
-      if (updateError) {
-        console.error("Failed to update transaction:", updateError);
-      }
     }
 
     if (error) {
@@ -354,8 +313,6 @@ export const allocateVotes = async (
     };
   } catch (error) {
     console.error("Failed to create attestation:", error);
-    // Note: We don't throw here because the vote allocation was successful
-    // The attestation is a nice-to-have but not critical for the user experience
     return {
       success: true,
       message: `Successfully allocated ${amount} vote${amount === 1 ? "" : "s"}, but attestation failed`,

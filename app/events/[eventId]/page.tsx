@@ -126,19 +126,17 @@ export default async function EventPage({
     supabase.from("projects").select('*, project_allocations(votes)').eq("event_id", eventId)
   ]);
 
+  // Fetch profile data after we have the user
+  const { data: profile } = user 
+    ? await supabase.from('profiles').select('admin').eq('id', user.id).single()
+    : { data: null };
+
   if (!event) {
     notFound();
   }
 
-  // Check if user is an admin - this needs to wait for user
-  const { data: participant } = user ? await supabase
-    .from('event_participants')
-    .select('is_admin')
-    .eq('user_id', user.id)
-    .eq('event_id', eventId)
-    .single() : { data: null };
-
-  const isAdmin = participant?.is_admin ?? false;
+  // Check if user is an admin from profile record
+  const isAdmin = profile?.admin ?? false;
 
   // Calculate matching amounts
   const voteDict = aggregateVotes(allocations || []);
