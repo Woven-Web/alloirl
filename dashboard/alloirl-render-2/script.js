@@ -865,6 +865,18 @@ async function updateVisualization() {
 (async function init() {
     await updateVisualization();
     
+    // Set up animation control button
+    const animationControl = document.getElementById('animation-control');
+    if (animationControl) {
+        animationControl.addEventListener('click', toggleAnimation);
+    }
+    
+    // Set up reset control button
+    const resetControl = document.getElementById('reset-control');
+    if (resetControl) {
+        resetControl.addEventListener('click', resetScrollPosition);
+    }
+    
     // Set up periodic refresh every minute to simulate data changes
     const refreshInterval = setInterval(async () => {
         console.log('Periodic refresh triggered');
@@ -1034,4 +1046,46 @@ function startEasingToStop(targetPosition) {
     easingStopStartTime = performance.now();
     easingStopStartPosition = scrollPosition;
     easingStopTargetPosition = targetPosition;
+}
+
+/**
+ * Toggles the animation state between playing and paused
+ */
+function toggleAnimation() {
+    scrollPaused = !scrollPaused;
+    
+    // Update button icons
+    const pauseIcon = document.getElementById('pause-icon');
+    const playIcon = document.getElementById('play-icon');
+    
+    if (scrollPaused) {
+        // Show play icon when paused
+        pauseIcon.style.display = 'none';
+        playIcon.style.display = 'block';
+    } else {
+        // Show pause icon when playing
+        pauseIcon.style.display = 'block';
+        playIcon.style.display = 'none';
+    }
+}
+
+/**
+ * Resets the scroll position to the top
+ */
+function resetScrollPosition() {
+    // Temporarily pause scrolling
+    const wasPaused = scrollPaused;
+    scrollPaused = true;
+    
+    // Reset scroll position
+    scrollPosition = 0;
+    scrollDirection = 1; // Set direction to downward
+    updateScrollPosition();
+    
+    // If animation was playing before, resume it after a short delay
+    if (!wasPaused) {
+        setTimeout(() => {
+            scrollPaused = false;
+        }, 500);
+    }
 }

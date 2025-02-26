@@ -155,6 +155,9 @@ body {
   left: 0;
   right: 0;
   z-index: 10; /* Ensure footer stays above scrolling content */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .project-header-left {
@@ -408,4 +411,41 @@ body {
     z-index: 9999;
     animation: fadeOut 2s ease-in forwards;
     will-change: transform;
+}
+
+.animation-control, .reset-control {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 1, 178, 0.1);
+  border: none;
+  cursor: pointer;
+  margin-right: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
+}
+
+.footer:hover .animation-control,
+.footer:hover .reset-control {
+  opacity: 1;
+}
+
+.animation-control:hover,
+.reset-control:hover {
+  background: rgba(0, 1, 178, 0.3);
+}
+
+.animation-control svg,
+.reset-control svg {
+  width: 20px;
+  height: 20px;
+  fill: #0001B2;
+}
+
+.footer-controls {
+  display: flex;
+  align-items: center;
 }
