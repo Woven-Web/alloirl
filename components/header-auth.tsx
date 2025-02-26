@@ -60,10 +60,10 @@ export default function HeaderAuth() {
       setUser(user);
 
       if (user) {
-        // Fetch user profile
+        // Fetch user profile including admin status
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('name')
+          .select('name, admin')
           .eq('id', user.id)
           .single();
         setProfile(profileData);

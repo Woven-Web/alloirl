@@ -6,7 +6,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { Input } from "@/components/ui/input";
 import { AlloLogo } from "@/components/allo-logo";
 import { useSearchParams } from "next/navigation";
-import { startTransition, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 interface SignInResponse {
   refresh?: boolean;
@@ -19,6 +19,7 @@ export interface LoginSearchParams {
   message?: string;
   error?: string;
   type?: string;
+  returnTo?: string;
 }
 
 export default function Login() {
@@ -26,6 +27,7 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   let message = params.get("message") || "";
   let isOtpSent = params.get("otpSent") === "1";
@@ -45,18 +47,28 @@ export default function Login() {
       <form
         onSubmit={async (e) => {
           e.preventDefault();
-          const formData = new FormData();
-          formData.append("email", email);
-          if (code) {
-            formData.append("code", code);
-          }
-          const returnTo = params.get("returnTo");
-          if (returnTo) {
-            formData.append("returnTo", returnTo);
-          }
-          const result = await signInAction(formData) as SignInResponse;
-          if (result?.refresh) {
-            window.location.href = result.url || '/';
+          setIsSubmitting(true);
+          
+          try {
+            const formData = new FormData();
+            formData.append("email", email.trim().toLowerCase());
+            if (code) {
+              formData.append("code", code);
+            }
+            
+            const returnTo = params.get("returnTo");
+            if (returnTo) {
+              formData.append("returnTo", returnTo);
+            }
+            
+            const result = await signInAction(formData) as SignInResponse;
+            if (result?.refresh) {
+              window.location.href = result.url || '/';
+            }
+          } catch (error) {
+            console.error("Sign-in error:", error);
+          } finally {
+            setIsSubmitting(false);
           }
         }}
         className="w-full space-y-5"
@@ -67,7 +79,7 @@ export default function Login() {
           placeholder="Email Address"
           required
           value={email}
-          disabled={isOtpSent}
+          disabled={isOtpSent || isSubmitting}
           onChange={(e) => setEmail(e.target.value)}
           className="w-full h-[60px] bg-transparent border-2 border-brand-blue rounded-[10px] font-eyebrow text-lg text-brand-blue text-center placeholder:text-brand-blue"
         />
@@ -77,6 +89,8 @@ export default function Login() {
             name="code"
             placeholder="One Time Passcode"
             required
+            value={code}
+            disabled={isSubmitting}
             onChange={(e) => setCode(e.target.value)}
             className="w-full h-[60px] bg-transparent border-2 border-brand-blue rounded-[10px] font-eyebrow text-lg text-brand-blue text-center placeholder:text-brand-blue"
           />

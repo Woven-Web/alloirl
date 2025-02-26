@@ -3,8 +3,8 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 import { CONFIG } from './script.js';
 
 // Initialize Supabase client
-const supabaseUrl = 'https://uxylrdyyuidugrbbkurv.supabase.co'; // Replace with your actual URL
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4eWxyZHl5dWlkdWdyYmJrdXJ2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjM3MjY0MSwiZXhwIjoyMDUxOTQ4NjQxfQ.IMYYavm93SOK6cNa4V_is8MROrXZ-X610crXaEGan-8'; // Replace with your actual key
+const supabaseUrl = 'https://fudpimvsuddwhpbalpgy.supabase.co'; // Replace with your actual URL
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZHBpbXZzdWRkd2hwYmFscGd5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDI3NjAzNywiZXhwIjoyMDU1ODUyMDM3fQ.JjokWUheGRzs5_ggnAfab1ss3myQ0NUbtmH6ByWqbJk'; // Replace with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initialize JSConfetti
@@ -12,6 +12,9 @@ const jsConfetti = new JSConfetti();
 
 // Available emoji options (matching VoteAllocation.tsx)
 const EMOJI_OPTIONS = ['❤️', '🎉', '🚀', '💡', '🌱', '🐸', '🗿'];
+
+// Cache for the last fetched data to optimize incremental updates
+let lastFetchedData = null;
 
 // Function to get a random emoji from the options
 function getRandomEmoji() {
@@ -70,50 +73,81 @@ function rainEmoji(emoji, count = 150) {
 function createConfettiExplosion(emoji) {
     jsConfetti.addConfetti({
         emojis: [emoji],
-        emojiSize: 100,
+        emojiSize: 150,
         confettiNumber: 150,
-        confettiRadius: 8,
+        confettiRadius: 10,
         confettiColors: ['#F3FD8B', '#ffffff'],
     });
 }
 
+// Expose the createConfettiExplosion function globally for testing purposes
+window.createConfettiExplosion = createConfettiExplosion;
+
 /**
  * Fetches and transforms data for the visualization
  * @param {string} eventId - UUID of the event to fetch data for
+ * @param {boolean} isIncremental - Whether this is an incremental update
  * @returns {Promise<Object>} Transformed data for visualization
  */
-export async function fetchEventData(eventId) {
+export async function fetchEventData(eventId, isIncremental = false) {
     try {
-        // TODO: figure out pagination for initial dump of transactions
-        const [
-            { data: transactions },
-            { data: participants },
-            { data: projects },
-            { data: profiles },
-            matchingData
-        ] = await Promise.all([
-            supabase
+        // For incremental updates, we only need to fetch new matching data and transactions
+        // We can reuse participant and project data from the last fetch
+        let transactions, participants, projects, profiles;
+        
+        // Always fetch the latest matching data
+        const matchingResponse = await fetch('https://dev.jon.bo/api/matching', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId })
+        });
+        const matchingData = await matchingResponse.json();
+        
+        if (isIncremental && lastFetchedData) {
+            // For incremental updates, only fetch new transactions since last update
+            const lastTransactionTime = lastFetchedData.lastTransactionTime || new Date(0);
+            
+            // Fetch only new transactions
+            const { data: newTransactions } = await supabase
                 .from('transactions')
                 .select('*')
                 .eq('event_id', eventId)
-                .order('created_at', { ascending: true }),
-            supabase
-                .from('event_participants')
-                .select('*')
-                .eq('event_id', eventId),
-            supabase
-                .from('projects')
-                .select('*')
-                .eq('event_id', eventId),
-            supabase.from('profiles')
-                .select('*'),
-            fetch('http://localhost:3000/api/matching', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ eventId })
-            }).then(res => res.json())
-        ]);
-
+                .gt('created_at', lastTransactionTime.toISOString())
+                .order('created_at', { ascending: true });
+            
+            // Merge new transactions with existing ones
+            transactions = [...(lastFetchedData.transactions || []), ...(newTransactions || [])];
+            
+            // Reuse existing data for participants, projects, and profiles
+            participants = lastFetchedData.participants;
+            projects = lastFetchedData.projects;
+            profiles = lastFetchedData.profiles;
+        } else {
+            // For full updates, fetch all data
+            [
+                { data: transactions },
+                { data: participants },
+                { data: projects },
+                { data: profiles }
+            ] = await Promise.all([
+                supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('event_id', eventId)
+                    .order('created_at', { ascending: true }),
+                supabase
+                    .from('event_participants')
+                    .select('*')
+                    .eq('event_id', eventId),
+                supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('event_id', eventId),
+                supabase.from('profiles')
+                    .select('*')
+            ]);
+        }
+        
         console.log('Raw matchingData:', matchingData);
         
         // Ensure matchingData is properly structured
@@ -149,7 +183,7 @@ export async function fetchEventData(eventId) {
         })
         .filter(project => project.matchingAmount > 0) // Filter out projects with no matching amount
         .sort((a, b) => b.matchingAmount - a.matchingAmount) // Sort by matching amount descending
-        .slice(0, 5); // Only take top 5 projects
+        // .slice(0, 5); // Only take top 5 projects
 
         // Generate time slots (using existing CONFIG from script.js)
         const timeSlots = generateTimeSlots();
@@ -159,6 +193,13 @@ export async function fetchEventData(eventId) {
             // if (transaction.type !== 'vote_allocation') return;
 
             const txTime = new Date(transaction.created_at);
+
+            // To re-use tx from a past event for testing
+            // const txTime = new Date();
+            // txTime.setHours(new Date(transaction.created_at).getHours());
+            // txTime.setMinutes(new Date(transaction.created_at).getMinutes());
+            // txTime.setSeconds(new Date(transaction.created_at).getSeconds());
+            
             const slotIndex = findTimeSlotIndex(timeSlots, txTime);
             
             if (slotIndex === -1) return; // Transaction outside visualization window
@@ -193,6 +234,20 @@ export async function fetchEventData(eventId) {
                 projectId: transaction.project_id
             });
         });
+
+        // Store the last transaction time for incremental updates
+        const lastTransactionTime = transactions.length > 0 
+            ? new Date(transactions[transactions.length - 1].created_at)
+            : new Date();
+
+        // Cache the raw data for future incremental updates
+        lastFetchedData = {
+            transactions,
+            participants,
+            projects,
+            profiles,
+            lastTransactionTime
+        };
 
         return {
             timeSlots,
@@ -277,10 +332,16 @@ export function subscribeToProjectAllocations(eventId, onUpdate) {
         }, (payload) => {
             // Get reaction from payload or generate random one
             const reaction = payload.new?.reaction || getRandomEmoji();
+            
+            // Create confetti explosion with the reaction emoji
             createConfettiExplosion(reaction);
             
             // Call the update callback to refresh the visualization
-            onUpdate();
+            // We use setTimeout to ensure the confetti animation has time to start
+            // before we begin updating the visualization
+            setTimeout(() => {
+                onUpdate();
+            }, 100);
         })
         .subscribe();
 

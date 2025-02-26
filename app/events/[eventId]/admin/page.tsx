@@ -9,7 +9,6 @@ interface EventParticipant {
   id: string;
   user_id: string;
   available_votes: number;
-  is_admin: boolean;
   profile: {
     email: string;
   };
@@ -37,31 +36,45 @@ export default function AdminDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
+        console.log('No user found, redirecting to login');
         router.push('/login');
         return;
       }
 
-      // Check if user is an admin for this event
-      const { data: participant, error: participantError } = await supabase
-        .from('event_participants')
-        .select('is_admin')
-        .eq('user_id', user.id)
-        .eq('event_id', eventId)
-        .single();
+      console.log('Checking admin status for user:', user.id, 'and event:', eventId);
 
-      if (participantError) {
-        console.error('Error checking admin status:', participantError);
-        setError('Error checking admin status');
-        return;
+      try {
+        // Check if user is an admin in the profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('admin')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        console.log('Admin check result:', { profile, error: profileError });
+
+        if (profileError) {
+          console.error('Error checking admin status:', profileError);
+          setError('Error checking admin status');
+          setLoading(false);
+          return;
+        }
+
+        // If not an admin, redirect
+        if (!profile || profile.admin !== true) {
+          console.log('User is not an admin, redirecting...');
+          router.push(`/events/${eventId}`);
+          return;
+        }
+
+        console.log('User is confirmed as an admin');
+        setIsAuthorized(true);
+        fetchData();
+      } catch (err) {
+        console.error('Unexpected error during access check:', err);
+        setError('An unexpected error occurred');
+        setLoading(false);
       }
-
-      if (!participant?.is_admin) {
-        router.push(`/events/${eventId}`);
-        return;
-      }
-
-      setIsAuthorized(true);
-      fetchData();
     };
 
     checkAccess();
@@ -172,7 +185,6 @@ export default function AdminDashboard() {
           user_id: selectedUserId,
           event_id: eventId,
           available_votes: 100,
-          is_admin: false
         });
 
       if (insertError) {
@@ -225,9 +237,6 @@ export default function AdminDashboard() {
                   <tr key={participant.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{participant.profile.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{participant.available_votes}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {participant.is_admin ? 'Admin' : 'Participant'}
-                    </td>
                   </tr>
                 ))}
                 {participants.length === 0 && (
