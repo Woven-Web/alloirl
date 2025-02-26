@@ -192,11 +192,14 @@ export async function fetchEventData(eventId, isIncremental = false) {
         transactions.forEach(transaction => {
             // if (transaction.type !== 'vote_allocation') return;
 
-            // const txTime = new Date(transaction.created_at);
-            const txTime = new Date();
-            txTime.setHours(new Date(transaction.created_at).getHours());
-            txTime.setMinutes(new Date(transaction.created_at).getMinutes());
-            txTime.setSeconds(new Date(transaction.created_at).getSeconds());
+            const txTime = new Date(transaction.created_at);
+
+            // To re-use tx from a past event for testing
+            // const txTime = new Date();
+            // txTime.setHours(new Date(transaction.created_at).getHours());
+            // txTime.setMinutes(new Date(transaction.created_at).getMinutes());
+            // txTime.setSeconds(new Date(transaction.created_at).getSeconds());
+            
             const slotIndex = findTimeSlotIndex(timeSlots, txTime);
             
             if (slotIndex === -1) return; // Transaction outside visualization window

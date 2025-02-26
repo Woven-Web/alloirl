@@ -1083,7 +1083,7 @@ async function incrementalUpdate() {
     }
     
     // Set up test data button (for development only)
-    setupTestDataButton(eventId);
+    // setupTestDataButton(eventId);
     
     // Subscribe to project allocations for real-time updates
     console.log(`Setting up subscription for event ID: ${eventId}`);
