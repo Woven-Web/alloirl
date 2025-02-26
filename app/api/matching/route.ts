@@ -147,7 +147,7 @@ export async function POST(request: Request) {
     // Get all allocations for this event
     const { data: allocations, error } = await supabase
       .from('project_allocations')
-      .select('project_id, user_id, votes')
+      .select('project_id, user_id, votes, projects(name)')
       .eq('event_id', eventId)
       .gt('votes', 0);
 
