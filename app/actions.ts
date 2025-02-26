@@ -23,6 +23,170 @@ const encodedRedirect = (
 const recentImports = new Map<string, number>();
 const IMPORT_COOLDOWN = 5000; // 5 seconds
 
+// Helper function to handle allowlist checking and event registration
+async function handleAllowlistAndRegistration(user: any) {
+  const supabase = await createClient();
+  const adminClient = await createAdminClient();
+  
+  console.log("Checking allowlist for user with email:", user.email?.toLowerCase());
+  
+  // First, check all allowlist entries for this email
+  const { data: allAllowlistEntries, error: allAllowlistError } = await adminClient
+    .from("event_allowlist")
+    .select("*")
+    .eq("email", user.email?.toLowerCase());
+  
+  console.log("All allowlist entries for this email:", { 
+    entries: allAllowlistEntries, 
+    error: allAllowlistError,
+    count: allAllowlistEntries?.length || 0
+  });
+  
+  // Check if any of the allowlist entries are already registered
+  const registeredEntries = allAllowlistEntries?.filter(entry => entry.has_registered);
+  if (registeredEntries && registeredEntries.length > 0) {
+    console.log("User has already registered for some events:", registeredEntries);
+  }
+  
+  // Check for unregistered entries
+  const { data: unregisteredEntries, error: allowlistError } = await adminClient
+    .from("event_allowlist")
+    .select("*")
+    .eq("email", user.email?.toLowerCase())
+    .eq("has_registered", false);
+
+  console.log("Unregistered allowlist entries check result:", { 
+    entries: unregisteredEntries, 
+    count: unregisteredEntries?.length || 0,
+    error: allowlistError
+  });
+
+  // Process the most recent unregistered entry if available
+  const allowlistEntry = unregisteredEntries && unregisteredEntries.length > 0 
+    ? unregisteredEntries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] 
+    : null;
+  
+  if (allowlistEntry) {
+    console.log("Selected most recent unregistered allowlist entry:", {
+      id: allowlistEntry.id,
+      event_id: allowlistEntry.event_id,
+      created_at: allowlistEntry.created_at
+    });
+  }
+
+  if (allowlistEntry?.event_id) {
+    console.log("User on allowlist for event:", allowlistEntry.event_id);
+    
+    // Check if they already have a participant record for this event
+    const { data: existingParticipant, error: participantCheckError } = await supabase
+      .from("event_participants")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("event_id", allowlistEntry.event_id)
+      .single();
+    
+    console.log("Existing participant check:", {
+      existingParticipant,
+      error: participantCheckError,
+      errorCode: participantCheckError?.code
+    });
+    
+    // Only create a new participant record if one doesn't exist
+    if (!existingParticipant && participantCheckError?.code === 'PGRST116') { // PGRST116 is "not found"
+      // Create event participant with default 100 votes
+      const { error: participantError } = await adminClient
+        .from("event_participants")
+        .insert([
+          {
+            user_id: user.id,
+            event_id: allowlistEntry.event_id,
+            available_votes: 100,
+          },
+        ]);
+
+      if (participantError) {
+        console.error("Error creating event participant:", participantError);
+      } else {
+        console.log("Event participant created successfully");
+      }
+
+      // Mark allowlist entry as registered
+      const { error: allowlistUpdateError } = await adminClient
+        .from("event_allowlist")
+        .update({ has_registered: true })
+        .eq("email", user.email?.toLowerCase())
+        .eq("event_id", allowlistEntry.event_id);
+
+      if (allowlistUpdateError) {
+        console.error("Error updating allowlist:", allowlistUpdateError);
+      } else {
+        console.log("Allowlist entry updated successfully");
+      }
+      
+      // Return the event ID for redirection
+      return { newRegistration: true, eventId: allowlistEntry.event_id, allowlistUpdated: true };
+    } else if (existingParticipant) {
+      // If they already have a participant record but the allowlist entry is not marked as registered,
+      // update the allowlist entry
+      console.log("User already has a participant record for this event, updating allowlist entry");
+      
+      const { error: allowlistUpdateError } = await adminClient
+        .from("event_allowlist")
+        .update({ has_registered: true })
+        .eq("email", user.email?.toLowerCase())
+        .eq("event_id", allowlistEntry.event_id);
+
+      if (allowlistUpdateError) {
+        console.error("Error updating allowlist:", allowlistUpdateError);
+      } else {
+        console.log("Allowlist entry updated successfully");
+      }
+      
+      return { newRegistration: false, eventId: allowlistEntry.event_id, allowlistUpdated: true };
+    } else {
+      // In any other case, still mark the allowlist entry as registered
+      console.log("Updating allowlist entry as registered");
+      
+      const { error: allowlistUpdateError } = await adminClient
+        .from("event_allowlist")
+        .update({ has_registered: true })
+        .eq("email", user.email?.toLowerCase())
+        .eq("event_id", allowlistEntry.event_id);
+
+      if (allowlistUpdateError) {
+        console.error("Error updating allowlist:", allowlistUpdateError);
+      } else {
+        console.log("Allowlist entry updated successfully");
+      }
+      
+      return { newRegistration: false, eventId: allowlistEntry.event_id, allowlistUpdated: true };
+    }
+  }
+
+  // Get all events the user is participating in
+  const { data: participations, error: participationsError } = await supabase
+    .from("event_participants")
+    .select("event_id")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+  
+  console.log("User event participations:", {
+    participations,
+    error: participationsError,
+    count: participations?.length || 0
+  });
+  
+  // If user has event participations, return the most recent one
+  if (participations && participations.length > 0) {
+    console.log("Found most recent event participation:", participations[0].event_id);
+    return { newRegistration: false, eventId: participations[0].event_id, allowlistUpdated: false };
+  }
+
+  // No events found
+  console.log("No event participations found");
+  return { newRegistration: false, eventId: null, allowlistUpdated: false };
+}
+
 export const signInAction = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const code = formData.get("code") as string;
@@ -64,19 +228,6 @@ export const signInAction = async (formData: FormData) => {
 
     // Create profile if it doesn't exist
     if (!profile && user) {
-      // Use admin client for allowlist operations
-      const adminClient = await createAdminClient();
-      
-      // Check if user is on any event allowlist
-      const { data: allowlistEntry, error: allowlistError } = await adminClient
-        .from("event_allowlist")
-        .select("*")
-        .eq("email", user.email?.toLowerCase())
-        .eq("has_registered", false)
-        .single();
-
-      console.log("Allowlist check for new user:", { allowlistEntry, error: allowlistError });
-
       // Create the profile
       const { error: createError } = await supabase
         .from("profiles")
@@ -94,56 +245,40 @@ export const signInAction = async (formData: FormData) => {
         return encodedRedirect("error", "/sign-in", "Failed to create profile");
       }
 
-      // If user was on allowlist, create event_participants entry and update allowlist
-      if (allowlistEntry?.event_id) {
-        console.log("Creating event participant for event:", allowlistEntry.event_id);
-        
-        // Create event participant with default 10 votes
-        const { error: participantError } = await adminClient
-          .from("event_participants")
-          .insert([
-            {
-              user_id: user.id,
-              event_id: allowlistEntry.event_id,
-              available_votes: 100,
-            },
-          ]);
-
-        if (participantError) {
-          console.error("Error creating event participant:", participantError);
-        } else {
-          console.log("Event participant created successfully");
-        }
-
-        // Mark allowlist entry as registered
-        const { error: allowlistUpdateError } = await adminClient
-          .from("event_allowlist")
-          .update({ has_registered: true })
-          .eq("email", user.email)
-          .eq("event_id", allowlistEntry.event_id);
-
-        if (allowlistUpdateError) {
-          console.error("Error updating allowlist:", allowlistUpdateError);
-        } else {
-          console.log("Allowlist entry updated successfully");
-        }
-      }
-
+      // Check allowlist and handle registration
+      // This will mark any allowlist entries as registered=true even if we redirect to username page
+      const result = await handleAllowlistAndRegistration(user);
+      
+      // Always redirect to username page first for new users
       return { refresh: true, url: '/username' };
     }
 
+    // If profile exists but doesn't have a name, redirect to username page
     if (!profile?.name) {
       return { refresh: true, url: '/username' };
     }
 
-    // Use returnTo URL if provided, otherwise fallback to default
+    // Check allowlist and handle registration for existing users
+    const result = await handleAllowlistAndRegistration(user);
+    
+    // Use returnTo URL if provided
     const returnTo = formData.get("returnTo") as string;
     if (returnTo) {
       return { refresh: true, url: decodeURIComponent(returnTo) };
     }
+    
+    // If we just registered for a new event, redirect to it
+    if (result.newRegistration && result.eventId) {
+      return { refresh: true, url: `/events/${result.eventId}` };
+    }
+    
+    // If user has event participations, redirect to their most recent event
+    if (result.eventId) {
+      return { refresh: true, url: `/events/${result.eventId}` };
+    }
 
-    // TODO: make this dynamic
-    return { refresh: true, url: '/events/a6dbab6b-a108-4147-ab09-0cdf0d802edb' };
+    // Fallback to homepage if no events found
+    return { refresh: true, url: '/' };
   }
 
   if (!email) {
@@ -601,5 +736,22 @@ export const updateUsername = async (formData: FormData) => {
     return { error: updateError.message };
   }
 
-  return { refresh: true, url: '/events/a6dbab6b-a108-4147-ab09-0cdf0d802edb' };
+  console.log("Username updated successfully for user:", user.id);
+
+  // Check allowlist and handle registration
+  // This will mark any allowlist entries as registered=true and create event participants if needed
+  const result = await handleAllowlistAndRegistration(user);
+  
+  // If we just registered for a new event, redirect to it
+  if (result.newRegistration && result.eventId) {
+    return { refresh: true, url: `/events/${result.eventId}` };
+  }
+  
+  // If user has event participations, redirect to their most recent event
+  if (result.eventId) {
+    return { refresh: true, url: `/events/${result.eventId}` };
+  }
+
+  // Fallback to homepage if no events found
+  return { refresh: true, url: '/' };
 };
