@@ -2,10 +2,21 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect, notFound } from "next/navigation";
 import { ProjectWithEvent } from "@/types/project";
 
-interface ContactlessLinkWithProject {
+interface ContactlessLink {
   id: number;
-  name: string | null;
-  project: ProjectWithEvent;
+  slug: string;
+  project: {
+    id: string;
+    name: string | null;
+    event: {
+      id: string;
+      name: string | null;
+    } | null;
+  } | null;
+  event: {
+    id: string;
+    name: string | null;
+  } | null;
 }
 
 export default async function ContactlessRedirectPage({
@@ -17,30 +28,44 @@ export default async function ContactlessRedirectPage({
   const slug = (await params).slug;
 
   const { data, error } = await supabase
-    .from("project_contactless_links")
+    .from("contactless_links")
     .select(
       `
       id,
-      name,
+      slug,
       project:project_id ( 
         id, 
         name,
         event:event_id ( id, name )
+      ),
+      event:event_id (
+        id,
+        name
       )
     `,
     )
     .eq("slug", slug)
-    .single() as { data: ContactlessLinkWithProject | null; error: any };
+    .single() as { data: ContactlessLink | null; error: any };
 
   if (error) {
     return notFound();
   }
 
-  const projectId = data?.project?.id;
-  const eventId = data?.project?.event?.id;
+  // Handle project link (possibly with event)
+  if (data?.project) {
+    const projectId = data.project.id;
+    const eventId = data.project.event?.id;
 
-  if (projectId && eventId) {
-    return redirect(`/events/${eventId}/project/${projectId}`);
+    if (projectId && eventId) {
+      return redirect(`/events/${eventId}/project/${projectId}`);
+    } else if (projectId) {
+      return redirect(`/projects/${projectId}`);
+    }
+  }
+
+  // Handle direct event link
+  if (data?.event) {
+    return redirect(`/events/${data.event.id}`);
   }
 
   return notFound();

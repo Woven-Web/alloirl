@@ -8,6 +8,7 @@ import NewLinkForm from "./components/NewLinkForm";
 export default async function AdminDashboard() {
   const supabase = await createClient();
 
+  // Fetch projects
   const { data: projects } = await supabase
     .from("projects")
     .select(`
@@ -15,13 +16,17 @@ export default async function AdminDashboard() {
       name,
       description,
       created_at,
-      metadata,
-      project_contactless_links (
-        id,
-        name,
-        slug,
-        created_at
-      )
+      metadata
+    `);
+
+  // Fetch events
+  const { data: events } = await supabase
+    .from("events")
+    .select(`
+      id,
+      name,
+      description,
+      created_at
     `);
 
   return (
@@ -41,7 +46,7 @@ export default async function AdminDashboard() {
                 </div>
               }
             >
-              <LinksTable projects={projects || []} />
+              <LinksTable projects={projects || []} events={events || []} />
             </Suspense>
           </div>
         </div>
@@ -56,7 +61,7 @@ export default async function AdminDashboard() {
                 </div>
               }
             >
-              <NewLinkForm projects={projects || []} />
+              <NewLinkForm projects={projects || []} events={events || []} />
             </Suspense>
           </div>
         </div>

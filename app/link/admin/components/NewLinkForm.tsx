@@ -14,42 +14,56 @@ type Project = {
   metadata?: any;
 };
 
+type Event = {
+  id?: string;
+  name: string | null;
+  description?: string | null;
+  created_at?: string;
+};
+
 interface NewLinkFormProps {
   projects: Project[];
+  events: Event[];
 }
 
-const NewLinkForm = ({ projects }: NewLinkFormProps) => {
+const NewLinkForm = ({ projects, events }: NewLinkFormProps) => {
   const supabase = createClient();
-  const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [projectId, setProjectId] = useState<string | null>(null);
+  const [linkType, setLinkType] = useState<"project" | "event">("project");
+  const [entityId, setEntityId] = useState<string | null>(null);
   const [error, setError] = useState<PostgrestError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    console.log("handleSubmit", name, slug, projectId);
     e.preventDefault();
-    if (!slug || !projectId) return;
+    if (!slug || !entityId) return;
 
     setIsSubmitting(true);
     try {
-      console.log("Creating link", name, slug, projectId);
-      const { error } = await supabase.from("project_contactless_links").insert({
-        name,
-        slug,
-        project_id: projectId,
-      });
+      // Prepare data based on link type
+      const insertData = linkType === "project" 
+        ? { slug, project_id: entityId, event_id: null }
+        : { slug, project_id: null, event_id: entityId };
+      
+      console.log("Inserting data:", insertData);
+      
+      const { data, error } = await supabase.from("contactless_links").insert(insertData);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+
+      console.log("Insert successful:", data);
 
       // Reset form
-      setName("");
       setSlug("");
-      setProjectId(null);
+      setEntityId(null);
       
       // Refresh the page to show new link
       window.location.reload();
     } catch (err) {
+      console.error("Error submitting form:", err);
       setError(err as PostgrestError);
     } finally {
       setIsSubmitting(false);
@@ -58,24 +72,6 @@ const NewLinkForm = ({ projects }: NewLinkFormProps) => {
 
   return (
     <form onSubmit={handleSubmit} className="w-full max-w-2xl space-y-6">
-      {/* <div className="space-y-2">
-        <label
-          htmlFor="name"
-          className="block text-sm font-medium text-gray-700"
-        >
-          Name
-        </label>
-        <input
-          type="text"
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="block w-full rounded-md border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500 focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
-          placeholder="Enter a name for this link"
-          required
-        />
-      </div> */}
-
       <div className="space-y-2">
         <label
           htmlFor="slug"
@@ -91,29 +87,57 @@ const NewLinkForm = ({ projects }: NewLinkFormProps) => {
           className="block w-full rounded-md border border-gray-300 px-4 py-2 text-gray-900 placeholder-gray-500 focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
           placeholder="e.g. my-cool-link"
           required
-          pattern="[a-z0-9]+"
+          pattern="[a-z0-9\-]+"
           title="Lowercase letters, numbers, and hyphens only"
         />
       </div>
 
       <div className="space-y-2">
         <label
-          htmlFor="project"
+          htmlFor="linkType"
           className="block text-sm font-medium text-gray-700"
         >
-          Project
+          Link Type
         </label>
         <Select
-          value={projectId || ""}
-          onValueChange={setProjectId}
+          value={linkType}
+          onValueChange={(value) => {
+            setLinkType(value as "project" | "event");
+            setEntityId(null); // Reset entity selection when type changes
+          }}
           className="block w-full rounded-md border border-gray-300 px-4 py-2 text-gray-900 focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
         >
-          <option value="">Select a project</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
+          <option value="project">Project</option>
+          <option value="event">Event</option>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <label
+          htmlFor="entity"
+          className="block text-sm font-medium text-gray-700"
+        >
+          {linkType === "project" ? "Project" : "Event"}
+        </label>
+        <Select
+          value={entityId || ""}
+          onValueChange={setEntityId}
+          className="block w-full rounded-md border border-gray-300 px-4 py-2 text-gray-900 focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
+        >
+          <option value="">Select a {linkType}</option>
+          {linkType === "project" ? (
+            projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))
+          ) : (
+            events.map((event) => (
+              <option key={event.id} value={event.id}>
+                {event.name}
+              </option>
+            ))
+          )}
         </Select>
       </div>
 
@@ -127,7 +151,7 @@ const NewLinkForm = ({ projects }: NewLinkFormProps) => {
 
       <button
         type="submit"
-        disabled={isSubmitting || !slug || !projectId}
+        disabled={isSubmitting || !slug || !entityId}
         className="inline-flex items-center justify-center rounded-md bg-brand-blue px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-blue/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting ? "Creating..." : "Create Link"}
