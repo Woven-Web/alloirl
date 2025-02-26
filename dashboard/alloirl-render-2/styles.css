@@ -286,7 +286,6 @@ body {
 
 .connection {
   stroke: #F3FD8B;
-  stroke-width: 1.5;
   z-index: 100;
   fill: none;
 }
@@ -376,9 +375,6 @@ body {
 
 .vote-point {
   fill: #F3FD8B;
-  /* stroke: #0001B2;
-  stroke-width: 2px; */
-  r: 8;
   transition: r 0.2s ease;
   z-index: 50;
 }

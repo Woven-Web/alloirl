@@ -28,7 +28,7 @@ export const CONFIG = {
     time: {
         interval: 15,     // minutes between time slots
         eventDuration: 5, // duration in hours (changed from 5 to 4 to end at 9PM)
-        startHour: 17, // 24h format
+        startHour: 20, // 24h format
         format: (time) => {
             // Custom format to show "10 PM", "11 PM", etc.
             const hours = time.getHours();
@@ -133,7 +133,7 @@ function generateTimeSlots() {
 async function generateData(npl, dims, isIncremental = false) {
     // Get the event ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const eventId = urlParams.get('eventId') || 'ecfa178a-c0a2-4742-8605-b94cebae1073'; // Default event ID
+    const eventId = urlParams.get('eventId') || 'a6dbab6b-a108-4147-ab09-0cdf0d802edb'; // Default event ID
     
     try {
         // Use the fetchEventData function from supabase.js
@@ -484,8 +484,21 @@ function updateConnections() {
     const { data, timeScale, projectPositions } = window.connectionData;
     const svg = d3.select("#visualization svg g");
     
+    // Calculate the time range for scaling stroke width (same as in drawConnections)
+    const firstSlotTime = data.timeSlots[0].timestamp.getTime();
+    const lastSlotTime = data.timeSlots[data.timeSlots.length - 1].timestamp.getTime();
+    const timeRange = lastSlotTime - firstSlotTime;
+    
     // Instead of removing and redrawing connections, update their paths
     data.timeSlots.forEach((slot, slotIndex) => {
+        // Calculate a normalized time position (0 to 1) for this slot
+        const timePosition = (slot.timestamp.getTime() - firstSlotTime) / timeRange;
+        
+        // Calculate stroke width based on time position
+        const minStrokeWidth = 0.5;
+        const maxStrokeWidth = 2.0;
+        const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
+        
         slot.votes.forEach(vote => {
             const project = data.projects.find(p => p.id === vote.projectId);
             if (!project) return;
@@ -518,6 +531,7 @@ function updateConnections() {
             if (connection.node()) {
                 // Update existing connection
                 connection.attr("d", path.toString())
+                    .attr("stroke-width", strokeWidth) // Apply variable stroke width
                     .attr("fill", "none");
             }
         });
@@ -525,13 +539,22 @@ function updateConnections() {
     
     // Update vote points positions
     data.timeSlots.forEach((slot, slotIndex) => {
+        // Calculate a normalized time position (0 to 1) for this slot
+        const timePosition = (slot.timestamp.getTime() - firstSlotTime) / timeRange;
+        
+        // Calculate point radius based on time position
+        const minRadius = 6;
+        const maxRadius = 10;
+        const radius = minRadius + (timePosition * (maxRadius - minRadius));
+        
         slot.votes.forEach(vote => {
             const pointId = `vote-point-${vote.id}`;
             const point = svg.select(`#${pointId}`);
             
             if (point.node()) {
                 // Update existing point
-                point.attr("cy", vote.yPosition);
+                point.attr("cy", vote.yPosition)
+                     .attr("r", radius); // Apply variable radius
             }
         });
     });
@@ -769,7 +792,22 @@ function drawConnections(svg, data, timeScale, projectPositions) {
     // Collect all connections to draw
     const connections = [];
     
+    // Calculate the time range for scaling stroke width
+    const firstSlotTime = data.timeSlots[0].timestamp.getTime();
+    const lastSlotTime = data.timeSlots[data.timeSlots.length - 1].timestamp.getTime();
+    const timeRange = lastSlotTime - firstSlotTime;
+    
     data.timeSlots.forEach((slot, slotIndex) => {
+        // Calculate a normalized time position (0 to 1) for this slot
+        const timePosition = (slot.timestamp.getTime() - firstSlotTime) / timeRange;
+        
+        // Calculate stroke width based on time position
+        // Older connections (lower timePosition) get thinner strokes
+        // Newer connections (higher timePosition) get thicker strokes
+        const minStrokeWidth = 0.5;
+        const maxStrokeWidth = 2.0;
+        const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
+        
         slot.votes.forEach(vote => {
             const project = data.projects.find(p => p.id === vote.projectId);
             if (!project) return;
@@ -784,7 +822,9 @@ function drawConnections(svg, data, timeScale, projectPositions) {
                 targetX: projectPosition.x,
                 targetY: projectPosition.y,
                 projectId: project.id,
-                voteId: vote.id
+                voteId: vote.id,
+                strokeWidth: strokeWidth, // Add stroke width to connection data
+                timePosition: timePosition // Store time position for potential use in styling
             });
         });
     });
@@ -812,6 +852,7 @@ function drawConnections(svg, data, timeScale, projectPositions) {
         connectionsGroup.select(`#${conn.id}`)
             .attr("d", path.toString())
             .attr("data-project-id", conn.projectId)
+            .attr("stroke-width", conn.strokeWidth) // Apply variable stroke width
             .attr("fill", "none");
     });
     
@@ -830,6 +871,7 @@ function drawConnections(svg, data, timeScale, projectPositions) {
             .attr("class", "connection")
             .attr("d", path.toString())
             .attr("data-project-id", conn.projectId)
+            .attr("stroke-width", conn.strokeWidth) // Apply variable stroke width
             .attr("fill", "none")
             .style("opacity", 0)
             .transition()
@@ -858,12 +900,23 @@ function drawConnections(svg, data, timeScale, projectPositions) {
     // Collect all vote points
     const votePoints = [];
     data.timeSlots.forEach((slot, slotIndex) => {
+        // Calculate a normalized time position (0 to 1) for this slot
+        const timePosition = (slot.timestamp.getTime() - firstSlotTime) / timeRange;
+        
+        // Calculate point radius based on time position
+        // Older points (lower timePosition) get smaller radius
+        // Newer points (higher timePosition) get larger radius
+        const minRadius = 6;
+        const maxRadius = 10;
+        const radius = minRadius + (timePosition * (maxRadius - minRadius));
+        
         slot.votes.forEach(vote => {
             votePoints.push({
                 id: `vote-point-${vote.id}`,
                 x: timeScale(slot.timestamp),
                 y: vote.yPosition,
-                voteId: vote.id
+                voteId: vote.id,
+                radius: radius // Add radius to vote point data
             });
         });
     });
@@ -882,7 +935,8 @@ function drawConnections(svg, data, timeScale, projectPositions) {
     existingVotePoints.forEach(point => {
         votePointsGroup.select(`#${point.id}`)
             .attr("cx", point.x)
-            .attr("cy", point.y);
+            .attr("cy", point.y)
+            .attr("r", point.radius); // Apply variable radius
     });
     
     // Add new vote points
@@ -892,6 +946,7 @@ function drawConnections(svg, data, timeScale, projectPositions) {
             .attr("class", "vote-point")
             .attr("cx", point.x)
             .attr("cy", point.y)
+            .attr("r", point.radius) // Apply variable radius
             .style("opacity", 0)
             .transition()
             .duration(500)
@@ -1010,7 +1065,7 @@ async function incrementalUpdate() {
 (async function init() {
     // Get the event ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const eventId = urlParams.get('eventId') || 'ecfa178a-c0a2-4742-8605-b94cebae1073'; // Default event ID
+    const eventId = urlParams.get('eventId') || 'a6dbab6b-a108-4147-ab09-0cdf0d802edb'; // Default event ID
     
     // Initial full render
     await updateVisualization(true);
@@ -1026,6 +1081,9 @@ async function incrementalUpdate() {
     if (resetControl) {
         resetControl.addEventListener('click', resetScrollPosition);
     }
+    
+    // Set up test data button (for development only)
+    setupTestDataButton(eventId);
     
     // Subscribe to project allocations for real-time updates
     console.log(`Setting up subscription for event ID: ${eventId}`);
@@ -1051,6 +1109,294 @@ async function incrementalUpdate() {
         }
     });
 })();
+
+/**
+ * Sets up a test button for generating synthetic data (for development only)
+ * @param {string} eventId - The event ID to use for the synthetic data
+ */
+function setupTestDataButton(eventId) {
+    // Create the test button container
+    const testButtonContainer = document.createElement('div');
+    testButtonContainer.className = 'test-button-container';
+    testButtonContainer.style.position = 'fixed';
+    testButtonContainer.style.bottom = '20px';
+    testButtonContainer.style.right = '20px';
+    testButtonContainer.style.zIndex = '1000';
+    
+    // Create the test button
+    const testButton = document.createElement('button');
+    testButton.className = 'test-button';
+    testButton.innerHTML = '🧪 Test Data';
+    testButton.style.background = 'rgba(243, 253, 139, 0.9)';
+    testButton.style.color = '#0001B2';
+    testButton.style.border = 'none';
+    testButton.style.borderRadius = '4px';
+    testButton.style.padding = '8px 12px';
+    testButton.style.cursor = 'pointer';
+    testButton.style.fontWeight = 'bold';
+    testButton.style.fontSize = '14px';
+    testButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+    testButton.style.transition = 'all 0.2s ease';
+    
+    // Add hover effect
+    testButton.addEventListener('mouseenter', () => {
+        testButton.style.background = 'rgba(243, 253, 139, 1)';
+        testButton.style.transform = 'translateY(-2px)';
+        testButton.style.boxShadow = '0 4px 8px rgba(0,0,0,0.3)';
+    });
+    
+    testButton.addEventListener('mouseleave', () => {
+        testButton.style.background = 'rgba(243, 253, 139, 0.9)';
+        testButton.style.transform = 'translateY(0)';
+        testButton.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
+    });
+    
+    // Add click handler
+    testButton.addEventListener('click', () => {
+        generateSyntheticData(eventId);
+    });
+    
+    // Add the button to the container
+    testButtonContainer.appendChild(testButton);
+    
+    // Add the container to the document
+    document.body.appendChild(testButtonContainer);
+}
+
+/**
+ * Generates synthetic data and triggers the subscription event
+ * @param {string} eventId - The event ID to use for the synthetic data
+ */
+function generateSyntheticData(eventId) {
+    // Only proceed if we have current data
+    if (!currentData) {
+        console.error('No current data available for synthetic data generation');
+        return;
+    }
+    
+    console.log('Generating synthetic data...');
+    
+    // Get a random attendee from the first 30
+    const maxAttendeeIndex = Math.min(30, currentData.attendees.length);
+    const randomAttendeeIndex = Math.floor(Math.random() * maxAttendeeIndex);
+    const randomAttendee = currentData.attendees[randomAttendeeIndex];
+    
+    // Get a random project
+    const randomProjectIndex = Math.floor(Math.random() * currentData.projects.length);
+    const randomProject = currentData.projects[randomProjectIndex];
+    
+    // Get a random time slot (preferably a recent one)
+    const recentSlotCount = Math.min(5, currentData.timeSlots.length);
+    const slotIndex = currentData.timeSlots.length - 1 - Math.floor(Math.random() * recentSlotCount);
+    const timeSlot = currentData.timeSlots[slotIndex];
+    
+    console.log(`Creating synthetic vote: Attendee ${randomAttendee.displayId} -> Project ${randomProject.name} at ${timeSlot.displayTime}`);
+    
+    // Create a unique vote ID
+    const voteId = `synthetic_vote_${Date.now()}`;
+    
+    // Calculate y position based on attendee lane
+    const yPosition = (randomAttendee.lane * CONFIG.grid.rowHeight) + (CONFIG.grid.rowHeight / 2);
+    
+    // Add vote to time slot
+    timeSlot.votes.push({
+        id: voteId,
+        projectId: randomProject.id,
+        attendeeId: randomAttendee.id,
+        yPosition: yPosition
+    });
+    
+    // Cross-reference vote in project
+    randomProject.votes.push({
+        timeSlotIndex: slotIndex,
+        voteId: voteId,
+        attendeeId: randomAttendee.id
+    });
+    
+    // Cross-reference vote in attendee
+    randomAttendee.votes.push({
+        timeSlotIndex: slotIndex,
+        voteId: voteId,
+        projectId: randomProject.id
+    });
+    
+    // Shuffle project order to simulate re-ranking
+    shuffleProjects();
+    
+    // Directly draw the new connection instead of redrawing everything
+    drawSingleConnection(voteId, randomProject.id, timeSlot, yPosition);
+    
+    // Update project display to reflect new ranking
+    updateProjectDisplay();
+    
+    // Trigger the emoji animation from supabase.js
+    if (typeof createConfettiExplosion === 'function') {
+        // Get a random emoji
+        const emojis = ['❤️', '🎉', '🚀', '💡', '🌱', '🐸', '🗿'];
+        const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+        createConfettiExplosion(randomEmoji);
+    } else {
+        console.warn('createConfettiExplosion function not available');
+    }
+}
+
+/**
+ * Draws a single new connection without redrawing the entire visualization
+ * @param {string} voteId - The ID of the vote to draw
+ * @param {string} projectId - The ID of the project the vote is for
+ * @param {Object} timeSlot - The time slot the vote belongs to
+ * @param {number} yPosition - The y-position of the vote point
+ */
+function drawSingleConnection(voteId, projectId, timeSlot, yPosition) {
+    // Only proceed if we have connection data
+    if (!window.connectionData) {
+        console.error('No connection data available');
+        return;
+    }
+    
+    const { data, timeScale, projectPositions } = window.connectionData;
+    const svg = d3.select("#visualization svg g");
+    
+    // Find the project
+    const project = data.projects.find(p => p.id === projectId);
+    if (!project) {
+        console.error('Project not found');
+        return;
+    }
+    
+    // Find the project position
+    const projectPosition = projectPositions.find(p => p.id === projectId);
+    if (!projectPosition) {
+        console.error('Project position not found');
+        return;
+    }
+    
+    // Calculate the time range for scaling stroke width
+    const firstSlotTime = data.timeSlots[0].timestamp.getTime();
+    const lastSlotTime = data.timeSlots[data.timeSlots.length - 1].timestamp.getTime();
+    const timeRange = lastSlotTime - firstSlotTime;
+    
+    // Calculate a normalized time position (0 to 1) for this slot
+    const timePosition = (timeSlot.timestamp.getTime() - firstSlotTime) / timeRange;
+    
+    // Calculate stroke width based on time position
+    const minStrokeWidth = 0.5;
+    const maxStrokeWidth = 2.0;
+    const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
+    
+    // Calculate point radius based on time position
+    const minRadius = 6;
+    const maxRadius = 10;
+    const radius = minRadius + (timePosition * (maxRadius - minRadius));
+    
+    // Calculate connection path
+    const sourceX = timeScale(timeSlot.timestamp);
+    const sourceY = yPosition;
+    const targetX = projectPosition.x;
+    const targetY = projectPosition.y + scrollPosition; // Adjust for current scroll
+    
+    const path = d3.path();
+    path.moveTo(sourceX, sourceY);
+    path.bezierCurveTo(
+        sourceX + (targetX - sourceX)/3, sourceY,
+        sourceX + 2*(targetX - sourceX)/3, targetY,
+        targetX, targetY
+    );
+    
+    // Get the connections group
+    let connectionsGroup = svg.select(".connections-group");
+    if (connectionsGroup.empty()) {
+        connectionsGroup = svg.append("g").attr("class", "connections-group");
+    }
+    
+    // Add the new connection with animation
+    const connectionId = `connection-${voteId}`;
+    connectionsGroup.append("path")
+        .attr("id", connectionId)
+        .attr("class", "connection")
+        .attr("d", path.toString())
+        .attr("data-project-id", projectId)
+        .attr("stroke-width", strokeWidth)
+        .attr("fill", "none")
+        .style("opacity", 0)
+        .transition()
+        .duration(500)
+        .style("opacity", 1);
+    
+    // Get the vote points group
+    let votePointsGroup = svg.select(".vote-points-group");
+    if (votePointsGroup.empty()) {
+        votePointsGroup = svg.append("g").attr("class", "vote-points-group");
+    }
+    
+    // Add the new vote point with animation
+    const pointId = `vote-point-${voteId}`;
+    votePointsGroup.append("circle")
+        .attr("id", pointId)
+        .attr("class", "vote-point")
+        .attr("cx", sourceX)
+        .attr("cy", sourceY)
+        .attr("r", radius)
+        .style("opacity", 0)
+        .transition()
+        .duration(500)
+        .style("opacity", 1);
+}
+
+/**
+ * Updates the project display to reflect new ranking without redrawing everything
+ */
+function updateProjectDisplay() {
+    const projectsContainer = d3.select(".projects-column");
+    
+    // Get all project elements
+    const projectElements = projectsContainer.selectAll(".project");
+    
+    // Update project order and matching amounts
+    currentData.projects.forEach((project, index) => {
+        // Find the project element
+        const projectElement = projectsContainer.select(`#project-${project.id}`);
+        if (!projectElement.node()) return;
+        
+        // Update project rank
+        projectElement.select(".project-header-left")
+            .text(getOrdinal(index + 1));
+        
+        // Update project matching amount with animation
+        const matchingAmountElement = projectElement.select(".project-header-right").node();
+        if (matchingAmountElement) {
+            // Get current displayed amount (remove $ and commas)
+            const currentAmount = parseInt(matchingAmountElement.textContent.replace(/[$,]/g, '')) || 0;
+            // Animate to new amount
+            animateNumber(matchingAmountElement, currentAmount, project.matchingAmount, 1000, '$');
+        }
+        
+        // Reorder the element in the DOM
+        projectElement.node().parentNode.appendChild(projectElement.node());
+    });
+}
+
+/**
+ * Shuffles the order of projects to simulate re-ranking
+ */
+function shuffleProjects() {
+    // Only proceed if we have current data
+    if (!currentData || !currentData.projects || currentData.projects.length < 2) {
+        return;
+    }
+    
+    // Randomly adjust matching amounts to change ranking
+    currentData.projects.forEach(project => {
+        // Adjust by -20% to +20%
+        const adjustmentFactor = 0.8 + (Math.random() * 0.4);
+        project.matchingAmount = Math.round(project.matchingAmount * adjustmentFactor);
+    });
+    
+    // Re-sort projects by matching amount
+    currentData.projects.sort((a, b) => b.matchingAmount - a.matchingAmount);
+    
+    console.log('Projects re-ranked based on new matching amounts');
+}
 
 // Simple debounce function
 function debounce(func, wait) {

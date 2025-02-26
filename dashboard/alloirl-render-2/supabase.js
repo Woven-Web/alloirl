@@ -73,12 +73,15 @@ function rainEmoji(emoji, count = 150) {
 function createConfettiExplosion(emoji) {
     jsConfetti.addConfetti({
         emojis: [emoji],
-        emojiSize: 100,
+        emojiSize: 150,
         confettiNumber: 150,
-        confettiRadius: 8,
+        confettiRadius: 10,
         confettiColors: ['#F3FD8B', '#ffffff'],
     });
 }
+
+// Expose the createConfettiExplosion function globally for testing purposes
+window.createConfettiExplosion = createConfettiExplosion;
 
 /**
  * Fetches and transforms data for the visualization
@@ -93,7 +96,7 @@ export async function fetchEventData(eventId, isIncremental = false) {
         let transactions, participants, projects, profiles;
         
         // Always fetch the latest matching data
-        const matchingResponse = await fetch('http://localhost:3000/api/matching', {
+        const matchingResponse = await fetch('https://dev.jon.bo/api/matching', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventId })
@@ -180,7 +183,7 @@ export async function fetchEventData(eventId, isIncremental = false) {
         })
         .filter(project => project.matchingAmount > 0) // Filter out projects with no matching amount
         .sort((a, b) => b.matchingAmount - a.matchingAmount) // Sort by matching amount descending
-        .slice(0, 5); // Only take top 5 projects
+        // .slice(0, 5); // Only take top 5 projects
 
         // Generate time slots (using existing CONFIG from script.js)
         const timeSlots = generateTimeSlots();
@@ -189,7 +192,11 @@ export async function fetchEventData(eventId, isIncremental = false) {
         transactions.forEach(transaction => {
             // if (transaction.type !== 'vote_allocation') return;
 
-            const txTime = new Date(transaction.created_at);
+            // const txTime = new Date(transaction.created_at);
+            const txTime = new Date();
+            txTime.setHours(new Date(transaction.created_at).getHours());
+            txTime.setMinutes(new Date(transaction.created_at).getMinutes());
+            txTime.setSeconds(new Date(transaction.created_at).getSeconds());
             const slotIndex = findTimeSlotIndex(timeSlots, txTime);
             
             if (slotIndex === -1) return; // Transaction outside visualization window
