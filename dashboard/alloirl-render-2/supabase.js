@@ -96,7 +96,9 @@ export async function fetchEventData(eventId, isIncremental = false) {
         let transactions, participants, projects, profiles;
         
         // Always fetch the latest matching data
-        const matchingResponse = await fetch('https://dev.jon.bo/api/matching', {
+        // const matchingResponse = await fetch('http://localhost:3000/api/matching', {
+        // const matchingResponse = await fetch('https://dev.jon.bo/api/matching', {
+        const matchingResponse = await fetch('https://irl.allo.capital/api/matching', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ eventId })
@@ -181,9 +183,19 @@ export async function fetchEventData(eventId, isIncremental = false) {
                 numberContributions: matchingInfo.number_contributions
             };
         })
-        .filter(project => project.matchingAmount > 0) // Filter out projects with no matching amount
+        // .filter(project => project.matchingAmount > 0) // Filter out projects with no matching amount
         .sort((a, b) => b.matchingAmount - a.matchingAmount) // Sort by matching amount descending
         // .slice(0, 5); // Only take top 5 projects
+
+        // If all projects have the same matching amount, randomize their order
+        const allSameAmount = transformedProjects.every(p => p.matchingAmount === transformedProjects[0].matchingAmount);
+        if (allSameAmount) {
+            // Fisher-Yates shuffle
+            for (let i = transformedProjects.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [transformedProjects[i], transformedProjects[j]] = [transformedProjects[j], transformedProjects[i]];
+            }
+        }
 
         // Generate time slots (using existing CONFIG from script.js)
         const timeSlots = generateTimeSlots();
@@ -316,13 +328,41 @@ function getEventTiming() {
 }
 
 /**
- * Sets up realtime subscription for project allocations
+ * Sets up realtime subscription for project allocations and transactions
  * @param {string} eventId - UUID of the event to watch
  * @param {Function} onUpdate - Callback function to handle updates
- * @returns {Object} Subscription channel
+ * @returns {Object} Subscription object with unsubscribe method
  */
 export function subscribeToProjectAllocations(eventId, onUpdate) {
-    const channel = supabase
+    // Create a channel for transactions
+    const transactionsChannel = supabase
+        .channel('transactions_changes')
+        .on('postgres_changes', {
+            event: 'INSERT',  // Listen to insert events
+            schema: 'public',
+            table: 'transactions',
+            filter: `event_id=eq.${eventId}`
+        }, (payload) => {
+            console.log('New transaction detected:', payload);
+            
+            // Force a complete redraw of connections
+            setTimeout(() => {
+                // First update the data
+                onUpdate();
+                
+                // Then force a complete redraw of connections
+                setTimeout(() => {
+                    // Clear existing connections and redraw them completely
+                    if (window.forceConnectionsRedraw && typeof window.forceConnectionsRedraw === 'function') {
+                        window.forceConnectionsRedraw();
+                    }
+                }, 300);
+            }, 100);
+        })
+        .subscribe();
+    
+    // Keep the existing project allocations subscription
+    const projectAllocationsChannel = supabase
         .channel('project_allocations_changes')
         .on('postgres_changes', {
             event: '*',  // Listen to all events
@@ -336,14 +376,27 @@ export function subscribeToProjectAllocations(eventId, onUpdate) {
             // Create confetti explosion with the reaction emoji
             createConfettiExplosion(reaction);
             
-            // Call the update callback to refresh the visualization
-            // We use setTimeout to ensure the confetti animation has time to start
-            // before we begin updating the visualization
+            // Force a complete redraw of connections
             setTimeout(() => {
+                // First update the data
                 onUpdate();
+                
+                // Then force a complete redraw of connections
+                setTimeout(() => {
+                    // Clear existing connections and redraw them completely
+                    if (window.forceConnectionsRedraw && typeof window.forceConnectionsRedraw === 'function') {
+                        window.forceConnectionsRedraw();
+                    }
+                }, 300);
             }, 100);
         })
         .subscribe();
 
-    return channel;
+    // Return an object with both channels and an unsubscribe method
+    return {
+        unsubscribe: () => {
+            transactionsChannel.unsubscribe();
+            projectAllocationsChannel.unsubscribe();
+        }
+    };
 }

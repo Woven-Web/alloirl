@@ -149,7 +149,9 @@ body {
 
 .footer {
   height: 50px; 
-  background: #F3FD8B;
+  display: none;
+  /* background: #F3FD8B; */
+  background: transparent;
   position: fixed;
   bottom: 0;
   left: 0;
@@ -161,7 +163,7 @@ body {
 }
 
 .project-header-left {
-  font-size: 38px;
+  font-size: 30px;
   font-weight: 700;
 }
 
@@ -182,7 +184,7 @@ body {
 
 .project-name {
   color: #F3FD8B;
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 500;
   line-height: 1;
 }

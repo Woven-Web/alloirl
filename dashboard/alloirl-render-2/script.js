@@ -27,8 +27,8 @@ export const CONFIG = {
     },
     time: {
         interval: 15,     // minutes between time slots
-        eventDuration: 5, // duration in hours (changed from 5 to 4 to end at 9PM)
-        startHour: 20, // 24h format
+        eventDuration: 6, // duration in hours (changed from 5 to 4 to end at 9PM)
+        startHour: 11, // 24h format
         format: (time) => {
             // Custom format to show "10 PM", "11 PM", etc.
             const hours = time.getHours();
@@ -133,7 +133,7 @@ function generateTimeSlots() {
 async function generateData(npl, dims, isIncremental = false) {
     // Get the event ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const eventId = urlParams.get('eventId') || 'a6dbab6b-a108-4147-ab09-0cdf0d802edb'; // Default event ID
+    const eventId = urlParams.get('eventId') || 'd7a18f34-c7a8-499b-be2a-ca0316c9a680'; // Default event ID
     
     try {
         // Use the fetchEventData function from supabase.js
@@ -242,6 +242,24 @@ async function generateData(npl, dims, isIncremental = false) {
  * @param {boolean} isFullRedraw - Whether this is a full redraw or an incremental update
  */
 function createVisualization(data, config, dims, isFullRedraw = true) {
+    // Filter out attendees with no transactions
+    data.attendees = data.attendees.filter(attendee => attendee.votes.length > 0);
+    
+    // Reassign lane numbers to be sequential after filtering
+    data.attendees.forEach((attendee, index) => {
+        attendee.lane = index;
+    });
+    
+    // Update vote positions based on new lane numbers
+    data.timeSlots.forEach(slot => {
+        slot.votes.forEach(vote => {
+            const attendee = data.attendees.find(a => a.id === vote.attendeeId);
+            if (attendee) {
+                vote.yPosition = (attendee.lane * CONFIG.grid.rowHeight) + (CONFIG.grid.rowHeight / 2);
+            }
+        });
+    });
+    
     // Store the current data for future updates
     currentData = data;
     
@@ -260,11 +278,10 @@ function createVisualization(data, config, dims, isFullRedraw = true) {
     // Draw components
     drawTimeline(svg, data, timeScale, totalHeight);
     
-    if (isFullRedraw) {
-        // Full redraw includes attendees and grid lines
-        drawAttendees(data.attendees);
-        drawAttendeeGridLines(svg, data.attendees, totalHeight);
-    }
+    // For incremental updates, we need to update the attendees list too
+    // This ensures new participants with transactions are shown
+    drawAttendees(data.attendees);
+    drawAttendeeGridLines(svg, data.attendees, totalHeight);
     
     drawIntersections(svg, data, timeScale);
     const projectPositions = drawProjects(data.projects);
@@ -732,7 +749,7 @@ function drawProjects(projects) {
     projectContent
         .append("div")
         .attr("class", "project-path")
-        .text(d => `${d.numberContributions} contributions · ${formatMoney(d.contributionAmount)}`);
+        .text(d => `${d.numberContributions} contributions`);
     
     // Calculate positions for connections
     return calculateProjectPositions(projects, projectsContainer);
@@ -1065,7 +1082,7 @@ async function incrementalUpdate() {
 (async function init() {
     // Get the event ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const eventId = urlParams.get('eventId') || 'a6dbab6b-a108-4147-ab09-0cdf0d802edb'; // Default event ID
+    const eventId = urlParams.get('eventId') || 'd7a18f34-c7a8-499b-be2a-ca0316c9a680'; // Default event ID
     
     // Initial full render
     await updateVisualization(true);
@@ -1083,7 +1100,7 @@ async function incrementalUpdate() {
     }
     
     // Set up test data button (for development only)
-    // setupTestDataButton(eventId);
+    setupTestDataButton(eventId);
     
     // Subscribe to project allocations for real-time updates
     console.log(`Setting up subscription for event ID: ${eventId}`);
@@ -1176,7 +1193,7 @@ function generateSyntheticData(eventId) {
     
     console.log('Generating synthetic data...');
     
-    // Get a random attendee from the first 30
+    // Get a random attendee from the filtered list (all should have transactions)
     const maxAttendeeIndex = Math.min(30, currentData.attendees.length);
     const randomAttendeeIndex = Math.floor(Math.random() * maxAttendeeIndex);
     const randomAttendee = currentData.attendees[randomAttendeeIndex];
@@ -1468,6 +1485,8 @@ function updateIntersections() {
     
     // Filter intersections to only those in the visible range (with large buffer)
     let visibleIntersections = [];
+    
+    // Only process attendees who have at least one transaction
     data.attendees.forEach(attendee => {
         const yPosition = (attendee.lane * CONFIG.grid.rowHeight) + (CONFIG.grid.rowHeight / 2);
         
@@ -1515,6 +1534,8 @@ function drawIntersections(svg, data, timeScale) {
     
     // Draw all intersection dots
     let allIntersections = [];
+    
+    // Only process attendees who have at least one transaction
     data.attendees.forEach(attendee => {
         const yPosition = (attendee.lane * CONFIG.grid.rowHeight) + (CONFIG.grid.rowHeight / 2);
         
