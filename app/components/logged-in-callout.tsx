@@ -28,10 +28,10 @@ export function LoggedInCallout() {
         style={{ animation: 'sheen 3s ease-in-out infinite' }}
       />
       <Link 
-        href="/events/a6dbab6b-a108-4147-ab09-0cdf0d802edb"
+        href="/events/d7a18f34-c7a8-499b-be2a-ca0316c9a680"
         className="relative font-eyebrow text-lg text-brand-blue hover:opacity-80 transition-opacity"
       >
-        👉 Click here to see Cosmo.Local projects
+        👉 Click here to see Allo Summoning projects
       </Link>
     </div>
   );
