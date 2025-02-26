@@ -11,33 +11,46 @@ type Project = {
   name: string | null;
 };
 
-type ProjectContactlessLink = {
+type Event = {
+  id?: string;
+  name: string | null;
+};
+
+type ContactlessLink = {
   id: number;
   slug: string;
   created_at: string;
   project: Project | null;
+  event: Event | null;
 };
 
 interface LinksTableProps {
   projects: Project[];
-  initialLinks?: ProjectContactlessLink[];
+  events: Event[];
+  initialLinks?: ContactlessLink[];
 }
 
-const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
+const LinksTable = ({ initialLinks = [], projects, events }: LinksTableProps) => {
   const supabase = createClient();
-  const [links, setLinks] = useState<ProjectContactlessLink[]>(initialLinks);
+  const [links, setLinks] = useState<ContactlessLink[]>(initialLinks);
   const [_, setError] = useState<PostgrestError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState<number | null>(null);
   const [isUpdating, setIsUpdating] = useState<number | null>(null);
 
-  const handleProjectChange = async (linkId: number, newProjectId: string) => {
+  const handleLinkUpdate = async (linkId: number, newEntityId: string, entityType: 'project' | 'event') => {
     try {
       setIsUpdating(linkId);
+      
+      // Prepare update data based on entity type
+      const updateData = entityType === 'project' 
+        ? { project_id: newEntityId, event_id: null }
+        : { project_id: null, event_id: newEntityId };
+      
       const { error } = await supabase
-        .from("project_contactless_links")
-        .update({ project_id: newProjectId })
-        .eq("id", Number(linkId));
+        .from("contactless_links")
+        .update(updateData)
+        .eq("id", linkId);
 
       if (error) throw error;
 
@@ -45,11 +58,21 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
       setLinks(
         links.map((link) => {
           if (link.id === linkId) {
-            const newProject = projects.find((p) => p.id === newProjectId);
-            return {
-              ...link,
-              project: newProject as Project,
-            };
+            if (entityType === 'project') {
+              const newProject = projects.find((p) => p.id === newEntityId);
+              return {
+                ...link,
+                project: newProject as Project,
+                event: null,
+              };
+            } else {
+              const newEvent = events.find((e) => e.id === newEntityId);
+              return {
+                ...link,
+                project: null,
+                event: newEvent as Event,
+              };
+            }
           }
           return link;
         }),
@@ -61,7 +84,7 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
     }
   };
 
-  const handleDelete = async (link: ProjectContactlessLink) => {
+  const handleDelete = async (link: ContactlessLink) => {
     try {
       // Show confirmation dialog
       const isConfirmed = window.confirm(
@@ -72,9 +95,9 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
 
       setIsDeleting(link.id);
       const { error } = await supabase
-        .from("project_contactless_links")
+        .from("contactless_links")
         .delete()
-        .eq("id", Number(link.id));
+        .eq("id", link.id);
 
       if (error) {
         throw error;
@@ -93,8 +116,9 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Fetch links
-        const { data, error } = await supabase.from("project_contactless_links")
+        console.log("Fetching contactless links...");
+        // Fetch links with both project and event information
+        const { data, error } = await supabase.from("contactless_links")
           .select(`
           id,
           slug,
@@ -102,27 +126,37 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
           project:project_id (
             id, 
             name
+          ),
+          event:event_id (
+            id,
+            name
           )
         `);
 
         if (error) {
+          console.error("Error fetching links:", error);
           setError(error);
           setIsLoading(false);
           return;
         }
 
+        console.log("Fetched links:", data);
         if (data) {
           setLinks(
             data.map((item: any) => ({
               id: item.id,
               slug: item.slug,
               created_at: item.created_at,
-              project: item.project
-            })) as ProjectContactlessLink[],
+              project: item.project,
+              event: item.event
+            })) as ContactlessLink[],
           );
         }
         setIsLoading(false);
-      } catch {}
+      } catch (err) {
+        console.error("Unexpected error:", err);
+        setIsLoading(false);
+      }
     };
 
     fetchData();
@@ -145,7 +179,10 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
               Slug
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Project
+              Linked To
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Type
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Created
@@ -162,29 +199,53 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
                 {link?.slug}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {link.project && link.project.id && (
-                  <div className="relative">
-                    <Select
-                      value={link.project.id}
-                      onValueChange={(newValue) =>
-                        handleProjectChange(link.id, newValue)
-                      }
-                      disabled={isUpdating === link.id}
-                      className="block w-full rounded-md border border-gray-300 px-3 py-1.5 text-gray-900 focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
-                    >
+                <div className="relative">
+                  <Select
+                    value={link.project?.id || link.event?.id || ""}
+                    onValueChange={(newValue) => {
+                      // Determine if this is a project or event ID
+                      const isProject = newValue.startsWith('project_');
+                      const isEvent = newValue.startsWith('event_');
+                      
+                      // Extract the actual ID
+                      const entityId = isProject 
+                        ? newValue.replace('project_', '') 
+                        : newValue.replace('event_', '');
+                      
+                      // Update with the appropriate type
+                      handleLinkUpdate(
+                        link.id, 
+                        entityId, 
+                        isProject ? 'project' : 'event'
+                      );
+                    }}
+                    disabled={isUpdating === link.id}
+                    className="block w-full rounded-md border border-gray-300 px-3 py-1.5 text-gray-900 focus:border-brand-blue focus:ring-brand-blue sm:text-sm"
+                  >
+                    <optgroup label="Projects">
                       {projects.map((project) => (
-                        <option key={project.id} value={project.id}>
+                        <option key={`project_${project.id}`} value={`project_${project.id}`}>
                           {project.name}
                         </option>
                       ))}
-                    </Select>
-                    {isUpdating === link.id && (
-                      <div className="absolute right-6 top-1/2 -translate-y-1/2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-blue"></div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                    </optgroup>
+                    <optgroup label="Events">
+                      {events.map((event) => (
+                        <option key={`event_${event.id}`} value={`event_${event.id}`}>
+                          {event.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </Select>
+                  {isUpdating === link.id && (
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-brand-blue"></div>
+                    </div>
+                  )}
+                </div>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {link.project ? "Project" : "Event"}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 {new Date(link.created_at).toLocaleDateString()}
@@ -220,7 +281,7 @@ const LinksTable = ({ initialLinks = [], projects }: LinksTableProps) => {
                 colSpan={6}
                 className="px-6 py-4 text-center text-sm text-gray-500"
               >
-                No project links found
+                No links found
               </td>
             </tr>
           )}
