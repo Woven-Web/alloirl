@@ -1,5 +1,6 @@
 // Remove the Supabase import since we're using fake data
 // import { fetchEventData, subscribeToProjectAllocations } from './supabase.js';
+import { fetchEventData, subscribeToProjectAllocations } from './supabase.js';
 
 // Configuration object for the visualization
 export const CONFIG = {
@@ -80,6 +81,9 @@ let easingStopStartTime = null;
 let easingStopStartPosition = 0;
 let easingStopTargetPosition = 0;
 
+// Global state to track current data
+let currentData = null;
+
 // Calculate event timing parameters
 function getEventTiming() {
     const now = new Date();
@@ -126,95 +130,108 @@ function generateTimeSlots() {
 }
 
 // Replace generateData function with:
-async function generateData(npl, dims) {
-    // Create fake data instead of fetching from Supabase
+async function generateData(npl, dims, isIncremental = false) {
+    // Get the event ID from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventId = urlParams.get('eventId') || 'ecfa178a-c0a2-4742-8605-b94cebae1073'; // Default event ID
     
-    // Generate time slots
-    const timeSlots = generateTimeSlots();
-    const { eventStart, eventEnd } = getEventTiming();
-    
-    // Create 6 fake projects
-    const projects = Array.from({ length: 6 }, (_, i) => {
-        const contributionAmount = Math.floor(Math.random() * 500) + 100;
-        const numberContributions = Math.floor(Math.random() * 40) + 10;
+    try {
+        // Use the fetchEventData function from supabase.js
+        return await fetchEventData(eventId, isIncremental);
+    } catch (error) {
+        console.error('Error fetching event data:', error);
+        
+        // Fallback to fake data if there's an error
+        console.log('Falling back to fake data generation');
+        
+        // Create fake data instead of fetching from Supabase
+        // Generate time slots
+        const timeSlots = generateTimeSlots();
+        const { eventStart, eventEnd } = getEventTiming();
+        
+        // Create 6 fake projects
+        const projects = Array.from({ length: 6 }, (_, i) => {
+            const contributionAmount = Math.floor(Math.random() * 500) + 100;
+            const numberContributions = Math.floor(Math.random() * 40) + 10;
+            
+            return {
+                id: `project-${i + 1}`,
+                name: `Project ${String.fromCharCode(65 + i)}`,
+                votes: [],
+                matchingAmount: Math.floor(Math.random() * 1000) + 500,
+                contributionAmount: contributionAmount,
+                numberContributions: numberContributions
+            };
+        }).sort((a, b) => b.matchingAmount - a.matchingAmount); // Sort by matching amount
+        
+        // Create attendees (use CONFIG.attendees.count)
+        const attendees = Array.from({ length: CONFIG.attendees.count }, (_, i) => {
+            return {
+                id: `user-${i + 1}`,
+                displayId: `User ${i + 1}`,
+                credits: Math.floor(Math.random() * (CONFIG.attendees.maxCredits - CONFIG.attendees.minCredits)) + CONFIG.attendees.minCredits,
+                votes: [],
+                lane: i
+            };
+        });
+        
+        // Generate 2-5 transactions per attendee
+        attendees.forEach(attendee => {
+            // Random number of transactions for this attendee (2-5)
+            const numTransactions = Math.floor(Math.random() * 4) + 2;
+            
+            for (let j = 0; j < numTransactions; j++) {
+                // Pick a random project
+                const projectIndex = Math.floor(Math.random() * projects.length);
+                const project = projects[projectIndex];
+                
+                // Pick a random time slot, but only from slots before 9pm
+                // Calculate the 9pm cutoff index (this would be the last valid slot)
+                const cutoffHour = 21; // 9pm in 24-hour format
+                const validTimeSlots = timeSlots.filter(slot => slot.timestamp.getHours() < cutoffHour);
+                const slotIndex = Math.floor(Math.random() * validTimeSlots.length);
+                const timeSlot = validTimeSlots[slotIndex];
+                
+                // Find the actual index in the original timeSlots array
+                const actualSlotIndex = timeSlots.findIndex(slot => 
+                    slot.timestamp.getTime() === timeSlot.timestamp.getTime());
+                
+                // Create a unique vote ID
+                const voteId = `vote_${actualSlotIndex}_${attendee.id}_${j}`;
+                
+                // Calculate exact y position based on attendee lane
+                const yPosition = (attendee.lane * CONFIG.grid.rowHeight) + (CONFIG.grid.rowHeight / 2);
+                
+                // Add vote to time slot
+                timeSlot.votes.push({
+                    id: voteId,
+                    projectId: project.id,
+                    attendeeId: attendee.id,
+                    yPosition: yPosition
+                });
+                
+                // Cross-reference vote in project
+                project.votes.push({
+                    timeSlotIndex: actualSlotIndex,
+                    voteId: voteId,
+                    attendeeId: attendee.id
+                });
+                
+                // Cross-reference vote in attendee
+                attendee.votes.push({
+                    timeSlotIndex: actualSlotIndex,
+                    voteId: voteId,
+                    projectId: project.id
+                });
+            }
+        });
         
         return {
-            id: `project-${i + 1}`,
-            name: `Project ${String.fromCharCode(65 + i)}`,
-            votes: [],
-            matchingAmount: Math.floor(Math.random() * 1000) + 500,
-            contributionAmount: contributionAmount,
-            numberContributions: numberContributions
+            timeSlots,
+            projects,
+            attendees
         };
-    }).sort((a, b) => b.matchingAmount - a.matchingAmount); // Sort by matching amount
-    
-    // Create attendees (use CONFIG.attendees.count)
-    const attendees = Array.from({ length: CONFIG.attendees.count }, (_, i) => {
-        return {
-            id: `user-${i + 1}`,
-            displayId: `User ${i + 1}`,
-            credits: Math.floor(Math.random() * (CONFIG.attendees.maxCredits - CONFIG.attendees.minCredits)) + CONFIG.attendees.minCredits,
-            votes: [],
-            lane: i
-        };
-    });
-    
-    // Generate 2-5 transactions per attendee
-    attendees.forEach(attendee => {
-        // Random number of transactions for this attendee (2-5)
-        const numTransactions = Math.floor(Math.random() * 4) + 2;
-        
-        for (let j = 0; j < numTransactions; j++) {
-            // Pick a random project
-            const projectIndex = Math.floor(Math.random() * projects.length);
-            const project = projects[projectIndex];
-            
-            // Pick a random time slot, but only from slots before 9pm
-            // Calculate the 9pm cutoff index (this would be the last valid slot)
-            const cutoffHour = 21; // 9pm in 24-hour format
-            const validTimeSlots = timeSlots.filter(slot => slot.timestamp.getHours() < cutoffHour);
-            const slotIndex = Math.floor(Math.random() * validTimeSlots.length);
-            const timeSlot = validTimeSlots[slotIndex];
-            
-            // Find the actual index in the original timeSlots array
-            const actualSlotIndex = timeSlots.findIndex(slot => 
-                slot.timestamp.getTime() === timeSlot.timestamp.getTime());
-            
-            // Create a unique vote ID
-            const voteId = `vote_${actualSlotIndex}_${attendee.id}_${j}`;
-            
-            // Calculate exact y position based on attendee lane
-            const yPosition = (attendee.lane * CONFIG.grid.rowHeight) + (CONFIG.grid.rowHeight / 2);
-            
-            // Add vote to time slot
-            timeSlot.votes.push({
-                id: voteId,
-                projectId: project.id,
-                attendeeId: attendee.id,
-                yPosition: yPosition
-            });
-            
-            // Cross-reference vote in project
-            project.votes.push({
-                timeSlotIndex: actualSlotIndex,
-                voteId: voteId,
-                attendeeId: attendee.id
-            });
-            
-            // Cross-reference vote in attendee
-            attendee.votes.push({
-                timeSlotIndex: actualSlotIndex,
-                voteId: voteId,
-                projectId: project.id
-            });
-        }
-    });
-    
-    return {
-        timeSlots,
-        projects,
-        attendees
-    };
+    }
 }
 
 /**
@@ -222,23 +239,33 @@ async function generateData(npl, dims) {
  * @param {Object} data - The dataset to visualize
  * @param {Object} config - Configuration options
  * @param {Object} dims - Visualization dimensions
+ * @param {boolean} isFullRedraw - Whether this is a full redraw or an incremental update
  */
-function createVisualization(data, config, dims) {
+function createVisualization(data, config, dims, isFullRedraw = true) {
+    // Store the current data for future updates
+    currentData = data;
+    
     // Setup SVG
     const svg = setupSVG();
     const { width, height } = getContainerDimensions();
     viewportHeight = height;
     
     // Calculate total height based on number of attendees
-    totalHeight = data.attendees.length * CONFIG.grid.rowHeight;
+    // Add a small buffer to ensure grid extends below the last attendee
+    totalHeight = (data.attendees.length * CONFIG.grid.rowHeight) + CONFIG.grid.rowHeight;
     
     // Setup time scale
     const timeScale = createTimeScale(data, width);
     
     // Draw components
     drawTimeline(svg, data, timeScale, totalHeight);
-    drawAttendees(data.attendees);
-    drawAttendeeGridLines(svg, data.attendees, totalHeight);
+    
+    if (isFullRedraw) {
+        // Full redraw includes attendees and grid lines
+        drawAttendees(data.attendees);
+        drawAttendeeGridLines(svg, data.attendees, totalHeight);
+    }
+    
     drawIntersections(svg, data, timeScale);
     const projectPositions = drawProjects(data.projects);
     drawConnections(svg, data, timeScale, projectPositions);
@@ -490,7 +517,8 @@ function updateConnections() {
             
             if (connection.node()) {
                 // Update existing connection
-                connection.attr("d", path.toString());
+                connection.attr("d", path.toString())
+                    .attr("fill", "none");
             }
         });
     });
@@ -526,6 +554,14 @@ function drawAttendeeGridLines(svg, attendees, height) {
         .attr("x2", "100%")
         .attr("y1", (d, i) => i * CONFIG.grid.rowHeight)
         .attr("y2", (d, i) => i * CONFIG.grid.rowHeight);
+        
+    // Add an extra grid line at the bottom to complete the grid
+    svg.append("line")
+        .attr("class", "grid-line")
+        .attr("x1", 0)
+        .attr("x2", "100%")
+        .attr("y1", attendees.length * CONFIG.grid.rowHeight)
+        .attr("y2", attendees.length * CONFIG.grid.rowHeight);
 }
 
 /**
@@ -567,29 +603,33 @@ function drawTimeline(svg, data, timeScale, height) {
     // Clear existing timeline header
     const timeHeader = d3.select("#timeline-header").html('');
     
+    // Use a much larger height value to ensure lines extend well beyond the visible area
+    const extendedHeight = Math.max(height, 10000); // Use a very large value to ensure full coverage
+    
+    // Get current time for determining past/future
+    const { currentTime } = getEventTiming();
+    
     data.timeSlots.forEach((slot, i) => {
         const x = timeScale(slot.timestamp);
+        const isFuture = slot.timestamp > currentTime;
         
-        // Time marker in visualization
+        // Time marker in visualization - extend to full extended height
         svg.append("line")
-            .attr("class", "time-marker")
+            .attr("class", `time-marker ${isFuture ? 'future' : 'past'}`)
             .attr("x1", x)
             .attr("x2", x)
             .attr("y1", 0)
-            .attr("y2", height);
+            .attr("y2", extendedHeight);
 
         // Add hour lines and labels when minutes are 0
         if (slot.timestamp.getMinutes() === 0) {
-            // Add vertical hour line
+            // Add vertical hour line - make sure it extends to full extended height
             svg.append("line")
                 .attr("class", "hour-line")
                 .attr("x1", x)
                 .attr("x2", x)
                 .attr("y1", 0)
-                .attr("y2", height)
-                .attr("stroke", "#F3FD8B")
-                .attr("stroke-width", "0.5px")
-                .attr("stroke-opacity", "1");
+                .attr("y2", extendedHeight);
 
             // Add hour label
             timeHeader.append("div")
@@ -602,17 +642,14 @@ function drawTimeline(svg, data, timeScale, height) {
         }
     });
     
-    // Add a current time indicator line
-    const { currentTime } = getEventTiming();
+    // Add a current time indicator line - extend to full extended height
     const currentX = timeScale(currentTime);
     svg.append("line")
         .attr("class", "current-time-indicator")
         .attr("x1", currentX)
         .attr("x2", currentX)
         .attr("y1", 0)
-        .attr("y2", height)
-        .attr("stroke", "#F3FD8B")
-        .attr("stroke-width", "2px");
+        .attr("y2", extendedHeight);
 }
 
 /**
@@ -621,65 +658,59 @@ function drawTimeline(svg, data, timeScale, height) {
  * @returns {Array} Project positions for connections
  */
 function drawProjects(projects) {
-    const projectsContainer = d3.select(".projects-column").html('');
+    const projectsContainer = d3.select(".projects-column");
     
-    // Create project containers
-    const projectDivs = projectsContainer.selectAll(".project")
+    // Clear existing projects
+    projectsContainer.selectAll(".project").remove();
+    
+    // Create project elements
+    const projectElements = projectsContainer
+        .selectAll(".project")
         .data(projects)
         .enter()
         .append("div")
         .attr("class", "project")
-        .style("margin-bottom", `${CONFIG.project.spacing}px`);
-
-    // Add header section with single-line layout
-    const headers = projectDivs.append("div")
-        .attr("class", "project-header")
-        .style("padding", "8px 12px");  // Slightly reduced padding
+        .attr("id", d => `project-${d.id}`);
     
-    const headerLeft = headers.append("div")
+    // Add project headers
+    const projectHeaders = projectElements
+        .append("div")
+        .attr("class", "project-header");
+    
+    // Add project rank
+    projectHeaders
+        .append("div")
         .attr("class", "project-header-left")
-        .text('$0'); // Start at 0
+        .text((d, i) => getOrdinal(i + 1));
     
-    // Animate the matching amounts
-    headerLeft.each(function(d) {
-        animateNumber(this, 0, d.matchingAmount, 1000, '$');
+    // Add project matching amount
+    const matchingAmountElements = projectHeaders
+        .append("div")
+        .attr("class", "project-header-right")
+        .text(d => formatMoney(0)); // Start at 0
+    
+    // Animate the matching amount
+    matchingAmountElements.each(function(d) {
+        animateNumber(this, 0, d.matchingAmount, 1500, '$');
     });
     
-    const headerRight = headers.append("div")
-        .attr("class", "project-header-right")
-        .text((d, i) => `${getOrdinal(i + 1)} place`);
-
-    // Add content section (simplified)
-    const content = projectDivs.append("div")
+    // Add project content
+    const projectContent = projectElements
+        .append("div")
         .attr("class", "project-content");
     
-    content.append("div")
+    // Add project name
+    projectContent
+        .append("div")
         .attr("class", "project-name")
-        .text(d => d.name)
-        .style("font-size", d => d.name.length > 15 ? "24px" : "32px") // Reduce font size for longer names
-        .style("line-height", d => d.name.length > 15 ? "1.2" : "1.4"); // Adjust line height accordingly
+        .text(d => d.name);
     
-    const projectPath = content.append("div")
+    // Add project contribution info
+    projectContent
+        .append("div")
         .attr("class", "project-path")
-        .text('0 people • 0 votes'); // Start at 0
+        .text(d => `${d.numberContributions} contributions · ${formatMoney(d.contributionAmount)}`);
     
-    // Animate the contribution numbers
-    projectPath.each(function(d) {
-        const element = this;
-        // Create temporary elements for each number
-        const peopleSpan = document.createElement('span');
-        const votesSpan = document.createElement('span');
-        element.textContent = '';
-        element.appendChild(peopleSpan);
-        element.appendChild(document.createTextNode(' people • '));
-        element.appendChild(votesSpan);
-        element.appendChild(document.createTextNode(' votes'));
-        
-        // Animate both numbers
-        animateNumber(peopleSpan, 0, d.numberContributions, 1000);
-        animateNumber(votesSpan, 0, d.contributionAmount, 1000);
-    });
-
     // Calculate positions for connections
     return calculateProjectPositions(projects, projectsContainer);
 }
@@ -726,67 +757,158 @@ function getContainerDimensions() {
  * @param {Array} projectPositions - The calculated project positions
  */
 function drawConnections(svg, data, timeScale, projectPositions) {
-    const containerDim = getContainerDimensions();
-    const drawableWidth = containerDim.width - CONFIG.margin.left - CONFIG.margin.right;
-    
     // Store connection data for updates during scrolling
     window.connectionData = { data, timeScale, projectPositions };
     
-    // First draw all paths for votes
+    // Create a container for connections if it doesn't exist
+    let connectionsGroup = svg.select(".connections-group");
+    if (connectionsGroup.empty()) {
+        connectionsGroup = svg.append("g").attr("class", "connections-group");
+    }
+    
+    // Collect all connections to draw
+    const connections = [];
+    
     data.timeSlots.forEach((slot, slotIndex) => {
         slot.votes.forEach(vote => {
             const project = data.projects.find(p => p.id === vote.projectId);
             if (!project) return;
-
+            
             const projectPosition = projectPositions.find(p => p.id === project.id);
             if (!projectPosition) return;
             
-            const sourceX = timeScale(slot.timestamp);
-            const sourceY = vote.yPosition;
-            const targetX = projectPosition.x;
-            
-            // For initial drawing, project positions are already correct
-            const targetY = projectPosition.y;
-
-            // Calculate stroke width based on x position using drawableWidth
-            const strokeWidth = 0.5 + ((sourceX / drawableWidth) * 1);
-
-            const path = d3.path();
-            path.moveTo(sourceX, sourceY);
-            path.bezierCurveTo(
-                sourceX + (targetX - sourceX)/3, sourceY,
-                sourceX + 2*(targetX - sourceX)/3, targetY,
-                targetX, targetY
-            );
-
-            // Create a unique ID for this connection
-            const connectionId = `connection-${vote.id}`;
-
-            svg.append("path")
-                .attr("id", connectionId)
-                .attr("class", "connection")
-                .attr("d", path.toString())
-                .attr("stroke", "#F3FD8B")
-                .attr("fill", "none")
-                .style("stroke-width", `${strokeWidth}px`);
+            connections.push({
+                id: `connection-${vote.id}`,
+                sourceX: timeScale(slot.timestamp),
+                sourceY: vote.yPosition,
+                targetX: projectPosition.x,
+                targetY: projectPosition.y,
+                projectId: project.id,
+                voteId: vote.id
+            });
         });
     });
-
-    // Then draw all points
+    
+    // Get existing connection IDs
+    const existingConnectionIds = new Set();
+    connectionsGroup.selectAll("path.connection").each(function() {
+        existingConnectionIds.add(d3.select(this).attr("id"));
+    });
+    
+    // Split connections into new and existing
+    const newConnections = connections.filter(conn => !existingConnectionIds.has(conn.id));
+    const existingConnections = connections.filter(conn => existingConnectionIds.has(conn.id));
+    
+    // Update existing connections
+    existingConnections.forEach(conn => {
+        const path = d3.path();
+        path.moveTo(conn.sourceX, conn.sourceY);
+        path.bezierCurveTo(
+            conn.sourceX + (conn.targetX - conn.sourceX)/3, conn.sourceY,
+            conn.sourceX + 2*(conn.targetX - conn.sourceX)/3, conn.targetY,
+            conn.targetX, conn.targetY
+        );
+        
+        connectionsGroup.select(`#${conn.id}`)
+            .attr("d", path.toString())
+            .attr("data-project-id", conn.projectId)
+            .attr("fill", "none");
+    });
+    
+    // Add new connections
+    newConnections.forEach(conn => {
+        const path = d3.path();
+        path.moveTo(conn.sourceX, conn.sourceY);
+        path.bezierCurveTo(
+            conn.sourceX + (conn.targetX - conn.sourceX)/3, conn.sourceY,
+            conn.sourceX + 2*(conn.targetX - conn.sourceX)/3, conn.targetY,
+            conn.targetX, conn.targetY
+        );
+        
+        connectionsGroup.append("path")
+            .attr("id", conn.id)
+            .attr("class", "connection")
+            .attr("d", path.toString())
+            .attr("data-project-id", conn.projectId)
+            .attr("fill", "none")
+            .style("opacity", 0)
+            .transition()
+            .duration(500)
+            .style("opacity", 1);
+    });
+    
+    // Remove connections that no longer exist
+    const currentConnectionIds = new Set(connections.map(conn => conn.id));
+    connectionsGroup.selectAll("path.connection")
+        .filter(function() {
+            const id = d3.select(this).attr("id");
+            return !currentConnectionIds.has(id);
+        })
+        .transition()
+        .duration(300)
+        .style("opacity", 0)
+        .remove();
+    
+    // Draw vote points
+    let votePointsGroup = svg.select(".vote-points-group");
+    if (votePointsGroup.empty()) {
+        votePointsGroup = svg.append("g").attr("class", "vote-points-group");
+    }
+    
+    // Collect all vote points
+    const votePoints = [];
     data.timeSlots.forEach((slot, slotIndex) => {
         slot.votes.forEach(vote => {
-            // Create a unique ID for this point
-            const pointId = `vote-point-${vote.id}`;
-            
-            svg.append("circle")
-                .attr("id", pointId)
-                .attr("class", "vote-point")
-                .attr("cx", timeScale(slot.timestamp))
-                .attr("cy", vote.yPosition)
-                .attr("r", 4)
-                .attr("fill", "#F3FD8B");
+            votePoints.push({
+                id: `vote-point-${vote.id}`,
+                x: timeScale(slot.timestamp),
+                y: vote.yPosition,
+                voteId: vote.id
+            });
         });
     });
+    
+    // Get existing vote point IDs
+    const existingVotePointIds = new Set();
+    votePointsGroup.selectAll("circle.vote-point").each(function() {
+        existingVotePointIds.add(d3.select(this).attr("id"));
+    });
+    
+    // Split vote points into new and existing
+    const newVotePoints = votePoints.filter(point => !existingVotePointIds.has(point.id));
+    const existingVotePoints = votePoints.filter(point => existingVotePointIds.has(point.id));
+    
+    // Update existing vote points
+    existingVotePoints.forEach(point => {
+        votePointsGroup.select(`#${point.id}`)
+            .attr("cx", point.x)
+            .attr("cy", point.y);
+    });
+    
+    // Add new vote points
+    newVotePoints.forEach(point => {
+        votePointsGroup.append("circle")
+            .attr("id", point.id)
+            .attr("class", "vote-point")
+            .attr("cx", point.x)
+            .attr("cy", point.y)
+            .style("opacity", 0)
+            .transition()
+            .duration(500)
+            .style("opacity", 1);
+    });
+    
+    // Remove vote points that no longer exist
+    const currentVotePointIds = new Set(votePoints.map(point => point.id));
+    votePointsGroup.selectAll("circle.vote-point")
+        .filter(function() {
+            const id = d3.select(this).attr("id");
+            return !currentVotePointIds.has(id);
+        })
+        .transition()
+        .duration(300)
+        .style("opacity", 0)
+        .remove();
 }
 
 /**
@@ -844,26 +966,54 @@ function updateEventHeader() {
         .html(`Event: ${CONFIG.time.format(eventStart)} - ${CONFIG.time.format(eventEnd)} | Now: ${CONFIG.time.format(currentTime)}`);
 }
 
-// Update updateVisualization to be async:
-async function updateVisualization() {
-    const data = await generateData(nodesPerLine, DIMS);
-    createVisualization(data, CONFIG, DIMS);
+/**
+ * Updates the visualization with new data
+ * @param {boolean} isFullRedraw - Whether to perform a full redraw or incremental update
+ */
+async function updateVisualization(isFullRedraw = true) {
+    // Store current scroll position
+    const currentScrollPos = scrollPosition;
+    
+    // Get new data with incremental flag
+    const data = await generateData(nodesPerLine, DIMS, !isFullRedraw);
+    
+    // Create visualization with flag indicating if this is a full redraw
+    createVisualization(data, CONFIG, DIMS, isFullRedraw);
     updateEventHeader();
     
     // Recalculate total height based on the current number of attendees
     totalHeight = data.attendees.length * CONFIG.grid.rowHeight;
     
-    // Reset scroll position if it's beyond the new max scroll
-    const maxScroll = Math.max(0, totalHeight - viewportHeight);
-    if (scrollPosition > maxScroll) {
-        scrollPosition = maxScroll;
+    // Restore scroll position if possible
+    if (!isFullRedraw) {
+        scrollPosition = currentScrollPos;
+        
+        // Ensure scroll position is within bounds
+        const maxScroll = Math.max(0, totalHeight - viewportHeight);
+        if (scrollPosition > maxScroll) {
+            scrollPosition = maxScroll;
+        }
+        
         updateScrollPosition();
     }
 }
 
+/**
+ * Performs an incremental update of the visualization
+ * Only updates projects and their connections
+ */
+async function incrementalUpdate() {
+    await updateVisualization(false);
+}
+
 // Initial render needs to be async too:
 (async function init() {
-    await updateVisualization();
+    // Get the event ID from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventId = urlParams.get('eventId') || 'ecfa178a-c0a2-4742-8605-b94cebae1073'; // Default event ID
+    
+    // Initial full render
+    await updateVisualization(true);
     
     // Set up animation control button
     const animationControl = document.getElementById('animation-control');
@@ -877,17 +1027,27 @@ async function updateVisualization() {
         resetControl.addEventListener('click', resetScrollPosition);
     }
     
-    // Set up periodic refresh every minute to simulate data changes
+    // Subscribe to project allocations for real-time updates
+    console.log(`Setting up subscription for event ID: ${eventId}`);
+    const subscription = subscribeToProjectAllocations(eventId, () => {
+        console.log('Project allocation update received');
+        incrementalUpdate();
+    });
+    
+    // Set up periodic refresh every 5 minutes to ensure data stays fresh
     const refreshInterval = setInterval(async () => {
         console.log('Periodic refresh triggered');
-        await updateVisualization();
-    }, 60000); // 60000ms = 1 minute
+        await incrementalUpdate();
+    }, 300000); // 300000ms = 5 minutes
 
-    // Clean up interval when window unloads
+    // Clean up interval and subscription when window unloads
     window.addEventListener('unload', () => {
         clearInterval(refreshInterval);
         if (window.scrollAnimation) {
             cancelAnimationFrame(window.scrollAnimation);
+        }
+        if (subscription) {
+            subscription.unsubscribe();
         }
     });
 })();

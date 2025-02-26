@@ -263,14 +263,32 @@ body {
 }
 
 .time-marker {
-  /* stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 1; */
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.time-marker.future {
+  stroke-dasharray: 2 2;
+  stroke-opacity: 1;
+  /* stroke-width: 1px; */
+}
+
+.hour-line {
+  stroke: #F3FD8B;
+  stroke-width: 0.5px;
+  stroke-opacity: 1;
+}
+
+.current-time-indicator {
+  stroke: #F3FD8B;
+  stroke-width: 2px;
 }
 
 .connection {
   stroke: #F3FD8B;
   stroke-width: 1.5;
   z-index: 100;
+  fill: none;
 }
 
 .timeline-point {
@@ -333,10 +351,7 @@ body {
 } */
 
 .grid-line {
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-dasharray: 2 2;
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
+  display: none;
 }
 
 .time-label {
@@ -381,19 +396,16 @@ body {
 }
 
 .intersection-dot.past {
-  fill: #F3FD8B;  /* Filled yellow (adjust as needed) */
-  stroke-width: 1px;
-  /* stroke: #0001B2; */
-  r: 3;
+  fill: #F3FD8B;
   stroke: #0001B2;
   stroke-width: 2px;
+  r: 3;
   z-index: 50;
 }
 
 .intersection-dot.future {
   fill: none;
-  stroke: white;   /* Gray outline for future intersections */
-  opacity: 0.6;
+  stroke: rgba(255, 255, 255, 0.6);
   stroke-width: 0.5px;
   r: 2;
   z-index: 50;

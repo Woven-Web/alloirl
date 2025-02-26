@@ -13,6 +13,9 @@ const jsConfetti = new JSConfetti();
 // Available emoji options (matching VoteAllocation.tsx)
 const EMOJI_OPTIONS = ['❤️', '🎉', '🚀', '💡', '🌱', '🐸', '🗿'];
 
+// Cache for the last fetched data to optimize incremental updates
+let lastFetchedData = null;
+
 // Function to get a random emoji from the options
 function getRandomEmoji() {
     return EMOJI_OPTIONS[Math.floor(Math.random() * EMOJI_OPTIONS.length)];
@@ -80,40 +83,68 @@ function createConfettiExplosion(emoji) {
 /**
  * Fetches and transforms data for the visualization
  * @param {string} eventId - UUID of the event to fetch data for
+ * @param {boolean} isIncremental - Whether this is an incremental update
  * @returns {Promise<Object>} Transformed data for visualization
  */
-export async function fetchEventData(eventId) {
+export async function fetchEventData(eventId, isIncremental = false) {
     try {
-        // TODO: figure out pagination for initial dump of transactions
-        const [
-            { data: transactions },
-            { data: participants },
-            { data: projects },
-            { data: profiles },
-            matchingData
-        ] = await Promise.all([
-            supabase
+        // For incremental updates, we only need to fetch new matching data and transactions
+        // We can reuse participant and project data from the last fetch
+        let transactions, participants, projects, profiles;
+        
+        // Always fetch the latest matching data
+        const matchingResponse = await fetch('http://localhost:3000/api/matching', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ eventId })
+        });
+        const matchingData = await matchingResponse.json();
+        
+        if (isIncremental && lastFetchedData) {
+            // For incremental updates, only fetch new transactions since last update
+            const lastTransactionTime = lastFetchedData.lastTransactionTime || new Date(0);
+            
+            // Fetch only new transactions
+            const { data: newTransactions } = await supabase
                 .from('transactions')
                 .select('*')
                 .eq('event_id', eventId)
-                .order('created_at', { ascending: true }),
-            supabase
-                .from('event_participants')
-                .select('*')
-                .eq('event_id', eventId),
-            supabase
-                .from('projects')
-                .select('*')
-                .eq('event_id', eventId),
-            supabase.from('profiles')
-                .select('*'),
-            fetch('http://localhost:3000/api/matching', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ eventId })
-            }).then(res => res.json())
-        ]);
-
+                .gt('created_at', lastTransactionTime.toISOString())
+                .order('created_at', { ascending: true });
+            
+            // Merge new transactions with existing ones
+            transactions = [...(lastFetchedData.transactions || []), ...(newTransactions || [])];
+            
+            // Reuse existing data for participants, projects, and profiles
+            participants = lastFetchedData.participants;
+            projects = lastFetchedData.projects;
+            profiles = lastFetchedData.profiles;
+        } else {
+            // For full updates, fetch all data
+            [
+                { data: transactions },
+                { data: participants },
+                { data: projects },
+                { data: profiles }
+            ] = await Promise.all([
+                supabase
+                    .from('transactions')
+                    .select('*')
+                    .eq('event_id', eventId)
+                    .order('created_at', { ascending: true }),
+                supabase
+                    .from('event_participants')
+                    .select('*')
+                    .eq('event_id', eventId),
+                supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('event_id', eventId),
+                supabase.from('profiles')
+                    .select('*')
+            ]);
+        }
+        
         console.log('Raw matchingData:', matchingData);
         
         // Ensure matchingData is properly structured
@@ -193,6 +224,20 @@ export async function fetchEventData(eventId) {
                 projectId: transaction.project_id
             });
         });
+
+        // Store the last transaction time for incremental updates
+        const lastTransactionTime = transactions.length > 0 
+            ? new Date(transactions[transactions.length - 1].created_at)
+            : new Date();
+
+        // Cache the raw data for future incremental updates
+        lastFetchedData = {
+            transactions,
+            participants,
+            projects,
+            profiles,
+            lastTransactionTime
+        };
 
         return {
             timeSlots,
@@ -277,10 +322,16 @@ export function subscribeToProjectAllocations(eventId, onUpdate) {
         }, (payload) => {
             // Get reaction from payload or generate random one
             const reaction = payload.new?.reaction || getRandomEmoji();
+            
+            // Create confetti explosion with the reaction emoji
             createConfettiExplosion(reaction);
             
             // Call the update callback to refresh the visualization
-            onUpdate();
+            // We use setTimeout to ensure the confetti animation has time to start
+            // before we begin updating the visualization
+            setTimeout(() => {
+                onUpdate();
+            }, 100);
         })
         .subscribe();
 
