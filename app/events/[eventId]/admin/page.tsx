@@ -10,14 +10,17 @@ interface EventParticipant {
   id: string;
   user_id: string;
   available_votes: number;
+  admin: boolean;
   profile: {
     email: string;
+    admin: boolean;
   };
 }
 
 interface Profile {
   id: string;
   email: string;
+  admin?: boolean;
 }
 
 interface AllowlistEntry {
@@ -45,6 +48,13 @@ export default function AdminDashboard() {
   const [votingActive, setVotingActive] = useState(false);
   const [updatingVoteStatus, setUpdatingVoteStatus] = useState(false);
   const [eventName, setEventName] = useState<string>("");
+  const [isEditingEventName, setIsEditingEventName] = useState(false);
+  const [tempEventName, setTempEventName] = useState<string>("");
+  const [updatingEventName, setUpdatingEventName] = useState(false);
+  const [fundingPool, setFundingPool] = useState<number | null>(null);
+  const [isEditingFundingPool, setIsEditingFundingPool] = useState(false);
+  const [tempFundingPool, setTempFundingPool] = useState<string>("");
+  const [updatingFundingPool, setUpdatingFundingPool] = useState(false);
   const [projects, setProjects] = useState<Array<{id: string, name: string | null, description: string | null}>>([]);
   const [newProject, setNewProject] = useState({ name: "", description: "" });
   const [editingProject, setEditingProject] = useState<{ id: string, name: string, description: string } | null>(null);
@@ -136,14 +146,37 @@ export default function AdminDashboard() {
           return;
         }
 
-        // If not an admin, redirect
-        if (!profile || profile.admin !== true) {
+        // Check if the user is a superadmin
+        let isSuperAdmin = profile?.admin === true;
+        
+        // If not a superadmin, check if they're an event admin
+        let isEventAdmin = false;
+        if (!isSuperAdmin) {
+          const { data: participant, error: participantError } = await supabase
+            .from('event_participants')
+            .select('admin')
+            .eq('event_id', eventId)
+            .eq('user_id', user.id)
+            .maybeSingle();
+            
+          if (participantError) {
+            console.error('Error checking event admin status:', participantError);
+            setError('Error checking event admin status');
+            setLoading(false);
+            return;
+          }
+          
+          isEventAdmin = participant?.admin === true;
+        }
+
+        // If not a superadmin or event admin, redirect
+        if (!isSuperAdmin && !isEventAdmin) {
           console.log('User is not an admin, redirecting...');
           router.push(`/events/${eventId}`);
           return;
         }
 
-        console.log('User is confirmed as an admin');
+        console.log('User is confirmed as an admin or event admin');
         setIsAuthorized(true);
         
         // Check schema before fetching data
@@ -168,10 +201,10 @@ export default function AdminDashboard() {
     setError(null);
 
     try {
-      // Fetch event data to get votes_active status and name
+      // Fetch event data to get votes_active status, name, and funding_pool
       const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select('votes_active, name')
+        .select('votes_active, name, funding_pool')
         .eq('id', eventId)
         .single();
         
@@ -180,7 +213,11 @@ export default function AdminDashboard() {
         setError('Error fetching event data');
       } else if (eventData) {
         setVotingActive(eventData.votes_active || false);
-        setEventName(eventData.name || "Unnamed Event");
+        const eventNameValue = eventData.name || "Unnamed Event";
+        setEventName(eventNameValue);
+        setTempEventName(eventNameValue);
+        setFundingPool(eventData.funding_pool);
+        setTempFundingPool(eventData.funding_pool?.toString() || "");
       }
 
       // Fetch all projects for this event
@@ -200,7 +237,7 @@ export default function AdminDashboard() {
       // First fetch all participants
       const { data: participantsData, error: participantsError } = await supabase
         .from('event_participants')
-        .select('*')
+        .select('id, user_id, available_votes, admin, event_id')
         .eq('event_id', eventId);
 
       if (participantsError) {
@@ -213,7 +250,7 @@ export default function AdminDashboard() {
         // Then fetch profiles for these participants
         const { data: profilesData, error: profilesError } = await supabase
           .from('profiles')
-          .select('id, email')
+          .select('id, email, admin')
           .in('id', participantsData.map(p => p.user_id));
 
         if (profilesError) {
@@ -222,8 +259,8 @@ export default function AdminDashboard() {
           return;
         }
 
-        // Create a map of user_id to email
-        const profileMap = new Map(profilesData?.map(p => [p.id, p.email]) || []);
+        // Create a map of user_id to profile data
+        const profileMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
         // Combine the data
         const transformedParticipants = participantsData
@@ -231,7 +268,8 @@ export default function AdminDashboard() {
           .map(p => ({
             ...p,
             profile: {
-              email: profileMap.get(p.user_id)!
+              email: profileMap.get(p.user_id)!.email,
+              admin: profileMap.get(p.user_id)!.admin || false
             }
           }))
           .sort((a, b) => a.profile.email.localeCompare(b.profile.email));
@@ -938,6 +976,116 @@ export default function AdminDashboard() {
     }
   };
 
+  // Add a function to toggle event admin status
+  const toggleEventAdmin = async (participantId: string, currentStatus: boolean) => {
+    if (!confirm(currentStatus 
+      ? "Are you sure you want to remove event admin privileges from this user?" 
+      : "Are you sure you want to make this user an event admin? They will be able to manage this event."
+    )) {
+      return;
+    }
+
+    setProcessing(true);
+    const supabase = createClient();
+    
+    try {
+      const { error } = await supabase
+        .from('event_participants')
+        .update({ admin: !currentStatus })
+        .eq('id', participantId);
+        
+      if (error) {
+        console.error('Error updating admin status:', error);
+        setError('Failed to update admin status');
+      } else {
+        // Update the local state
+        setParticipants(participants.map(p => 
+          p.id === participantId 
+            ? {...p, admin: !currentStatus} 
+            : p
+        ));
+      }
+    } catch (err) {
+      console.error('Exception updating admin status:', err);
+      setError('An unexpected error occurred');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Add a function to handle updating the event name
+  const handleUpdateEventName = async () => {
+    if (!tempEventName.trim()) return;
+    
+    setUpdatingEventName(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('events')
+        .update({ name: tempEventName.trim() })
+        .eq('id', eventId);
+        
+      if (error) {
+        console.error('Error updating event name:', error);
+        setError('Failed to update event name');
+        return;
+      }
+      
+      // Update the local state
+      setEventName(tempEventName.trim());
+      
+      // Exit editing mode
+      setIsEditingEventName(false);
+    } catch (err) {
+      console.error('Unexpected error updating event name:', err);
+      setError('An unexpected error occurred while updating event name');
+    } finally {
+      setUpdatingEventName(false);
+    }
+  };
+
+  // Add a function to handle updating the funding pool
+  const handleUpdateFundingPool = async () => {
+    // Convert to number and validate
+    const fundingPoolNumber = Number(tempFundingPool);
+    if (isNaN(fundingPoolNumber) || fundingPoolNumber < 0) {
+      setError('Funding pool must be a valid positive number');
+      return;
+    }
+    
+    setUpdatingFundingPool(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('events')
+        .update({ funding_pool: fundingPoolNumber })
+        .eq('id', eventId);
+        
+      if (error) {
+        console.error('Error updating funding pool:', error);
+        setError('Failed to update funding pool');
+        return;
+      }
+      
+      // Update the local state
+      setFundingPool(fundingPoolNumber);
+      
+      // Exit editing mode
+      setIsEditingFundingPool(false);
+    } catch (err) {
+      console.error('Unexpected error updating funding pool:', err);
+      setError('An unexpected error occurred while updating funding pool');
+    } finally {
+      setUpdatingFundingPool(false);
+    }
+  };
+
   if (!isAuthorized) {
     return null;
   }
@@ -948,31 +1096,123 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-4 max-w-4xl mx-auto space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <Link href={`/events/${eventId}`} className="group">
-            <h1 className="text-brand-blue font-eyebrow text-4xl group-hover:underline">{eventName}</h1>
-            <p className="text-gray-500 text-sm mt-1">Admin Dashboard</p>
-          </Link>
+      <div className="flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            {isEditingEventName ? (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={tempEventName}
+                  onChange={(e) => setTempEventName(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md shadow-sm text-2xl font-eyebrow focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                  placeholder="Event Name"
+                  autoFocus
+                />
+                <button
+                  onClick={handleUpdateEventName}
+                  disabled={updatingEventName || !tempEventName.trim()}
+                  className="px-3 py-1 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-50 text-sm"
+                >
+                  {updatingEventName ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditingEventName(false);
+                    setTempEventName(eventName); // Reset to current name
+                  }}
+                  className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <>
+                <Link href={`/events/${eventId}`} className="group">
+                  <h1 className="text-brand-blue font-eyebrow text-4xl group-hover:underline">{eventName}</h1>
+                  <p className="text-gray-500 text-sm mt-1">Admin Dashboard</p>
+                </Link>
+                <button
+                  onClick={() => {
+                    setIsEditingEventName(true);
+                    setTempEventName(eventName);
+                  }}
+                  className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+                >
+                  Edit Name
+                </button>
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`text-sm font-medium ${votingActive ? 'text-green-600' : 'text-gray-600'}`}>
+              Voting is {votingActive ? 'Active' : 'Inactive'}
+            </span>
+            <button
+              onClick={toggleVotingStatus}
+              disabled={updatingVoteStatus}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                votingActive 
+                  ? 'bg-red-100 text-red-800 hover:bg-red-200' 
+                  : 'bg-green-100 text-green-800 hover:bg-green-200'
+              } disabled:opacity-50`}
+            >
+              {updatingVoteStatus 
+                ? 'Updating...' 
+                : (votingActive ? 'Deactivate Voting' : 'Activate Voting')
+              }
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-sm font-medium ${votingActive ? 'text-green-600' : 'text-gray-600'}`}>
-            Voting is {votingActive ? 'Active' : 'Inactive'}
-          </span>
-          <button
-            onClick={toggleVotingStatus}
-            disabled={updatingVoteStatus}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              votingActive 
-                ? 'bg-red-100 text-red-800 hover:bg-red-200' 
-                : 'bg-green-100 text-green-800 hover:bg-green-200'
-            } disabled:opacity-50`}
-          >
-            {updatingVoteStatus 
-              ? 'Updating...' 
-              : (votingActive ? 'Deactivate Voting' : 'Activate Voting')
-            }
-          </button>
+        
+        <div className="flex items-center">
+          <span className="mr-3 text-sm font-medium text-gray-700">Funding Pool:</span>
+          {isEditingFundingPool ? (
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={tempFundingPool}
+                  onChange={(e) => setTempFundingPool(e.target.value)}
+                  className="pl-7 px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                  placeholder="Amount"
+                  autoFocus
+                />
+              </div>
+              <button
+                onClick={handleUpdateFundingPool}
+                disabled={updatingFundingPool}
+                className="px-3 py-1 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-50 text-sm"
+              >
+                {updatingFundingPool ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditingFundingPool(false);
+                  setTempFundingPool(fundingPool?.toString() || ""); // Reset to current amount
+                }}
+                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold">${fundingPool?.toLocaleString() || "0"}</span>
+              <button
+                onClick={() => {
+                  setIsEditingFundingPool(true);
+                  setTempFundingPool(fundingPool?.toString() || "");
+                }}
+                className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
+                Edit Amount
+              </button>
+            </div>
+          )}
         </div>
       </div>
       
@@ -1179,6 +1419,20 @@ export default function AdminDashboard() {
                   <tr key={participant.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{participant.profile.email}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{participant.available_votes}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm flex items-center space-x-2">
+                      <span className={`px-2 py-1 rounded text-xs ${participant.profile.admin ? 'bg-indigo-100 text-indigo-800' : participant.admin ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                        {participant.profile.admin ? 'Super Admin' : participant.admin ? 'Event Admin' : 'Regular User'}
+                      </span>
+                      {!participant.profile.admin && (
+                        <button
+                          onClick={() => toggleEventAdmin(participant.id, participant.admin)}
+                          disabled={processing}
+                          className={`ml-2 px-2 py-1 text-xs rounded ${participant.admin ? 'bg-red-100 text-red-800 hover:bg-red-200' : 'bg-green-100 text-green-800 hover:bg-green-200'}`}
+                        >
+                          {participant.admin ? 'Remove Admin' : 'Make Event Admin'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {participants.length === 0 && (

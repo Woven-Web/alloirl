@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import Link from "next/link";
 
-const MATCHING_POOL = 5000; // Will come from events table later
+// Default value as fallback if no funding pool is set
+const DEFAULT_MATCHING_POOL = 5000;
 const THRESHOLD = 25.0;
 
 interface ProjectAllocation {
@@ -127,21 +128,43 @@ export default async function EventPage({
   ]);
 
   // Fetch profile data after we have the user
-  const { data: profile } = user 
-    ? await supabase.from('profiles').select('admin').eq('id', user.id).single()
-    : { data: null };
+  let isAdmin = false;
+  let isEventAdmin = false;
+  
+  if (user) {
+    // Check if user is a superadmin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('admin')
+      .eq('id', user.id)
+      .single();
+    
+    isAdmin = profile?.admin ?? false;
+    
+    // Check if user is an event admin
+    if (!isAdmin) {
+      const { data: participant } = await supabase
+        .from('event_participants')
+        .select('admin')
+        .eq('event_id', eventId)
+        .eq('user_id', user.id)
+        .single();
+      
+      isEventAdmin = participant?.admin ?? false;
+    }
+  }
 
   if (!event) {
     notFound();
   }
 
-  // Check if user is an admin from profile record
-  const isAdmin = profile?.admin ?? false;
+  // Get the funding pool amount from the event data or use default
+  const matchingPool = event.funding_pool || DEFAULT_MATCHING_POOL;
 
   // Calculate matching amounts
   const voteDict = aggregateVotes(allocations || []);
   const pairTotals = getTotalsByPair(voteDict);
-  const matchingResults = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
+  const matchingResults = calculateMatching(voteDict, pairTotals, THRESHOLD, matchingPool);
   const matchingMap = new Map(matchingResults.map(result => [result.project_id, result]));
 
   // Calculate total votes for each project and sort by votes
@@ -160,7 +183,7 @@ export default async function EventPage({
     <div className="flex flex-col w-full px-4 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-brand-blue font-eyebrow text-4xl">{event.name}</h1>
-        {isAdmin && (
+        {(isAdmin || isEventAdmin) && (
           <Link 
             href={`/events/${eventId}/admin`}
             className="px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90"
@@ -171,7 +194,13 @@ export default async function EventPage({
       </div>
       
       <div className="space-y-4">
-        <h2 className="text-brand-blue font-eyebrow text-4xl">Projects</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-brand-blue font-eyebrow text-4xl">Projects</h2>
+          <div className="text-gray-700">
+            <span className="font-medium">Funding Pool: </span>
+            <span className="text-green-600 font-semibold">${matchingPool.toLocaleString()}</span>
+          </div>
+        </div>
         
         {projectsWithVotes && projectsWithVotes.length > 0 ? (
           <div className="space-y-4">

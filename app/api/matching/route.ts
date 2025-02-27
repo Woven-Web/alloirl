@@ -1,7 +1,8 @@
 import { createClient } from '@/utils/supabase/server';
 import { NextResponse } from 'next/server';
 
-const MATCHING_POOL = 5000; // Will come from events table later
+// Default value as fallback if no funding pool is set
+const DEFAULT_MATCHING_POOL = 5000;
 const THRESHOLD = 25.0; // Same as original QF implementation
 
 // Add CORS headers helper
@@ -144,6 +145,21 @@ export async function POST(request: Request) {
 
     const supabase = await createClient();
 
+    // Get the funding pool amount from the events table
+    const { data: eventData, error: eventError } = await supabase
+      .from('events')
+      .select('funding_pool')
+      .eq('id', eventId)
+      .single();
+
+    if (eventError) {
+      console.error('Error fetching event data:', eventError);
+      // Continue with default value if there's an error
+    }
+
+    // Use the funding_pool from the database or fall back to default value
+    const matchingPool = eventData?.funding_pool || DEFAULT_MATCHING_POOL;
+
     // Get all allocations for this event
     const { data: allocations, error } = await supabase
       .from('project_allocations')
@@ -171,8 +187,8 @@ export async function POST(request: Request) {
     // Calculate pair totals
     const pairTotals = getTotalsByPair(voteDict);
     
-    // Calculate matching amounts
-    const results = calculateMatching(voteDict, pairTotals, THRESHOLD, MATCHING_POOL);
+    // Calculate matching amounts using the dynamic matching pool amount
+    const results = calculateMatching(voteDict, pairTotals, THRESHOLD, matchingPool);
 
     // Add timing metadata to response
     return NextResponse.json({
@@ -180,6 +196,7 @@ export async function POST(request: Request) {
       metadata: {
         total_allocations: allocations.length,
         total_projects: Object.keys(voteDict).length,
+        matching_pool: matchingPool
       }
     }, { headers: corsHeaders });
   } catch (error) {
