@@ -41,6 +41,14 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [schemaInfo, setSchemaInfo] = useState<string | null>(null);
   const [has406Error, setHas406Error] = useState(false);
+  const [votingActive, setVotingActive] = useState(false);
+  const [updatingVoteStatus, setUpdatingVoteStatus] = useState(false);
+  const [eventName, setEventName] = useState<string>("");
+  const [projects, setProjects] = useState<Array<{id: string, name: string | null, description: string | null}>>([]);
+  const [newProject, setNewProject] = useState({ name: "", description: "" });
+  const [editingProject, setEditingProject] = useState<{ id: string, name: string, description: string } | null>(null);
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [projectActionLoading, setProjectActionLoading] = useState(false);
 
   // Helper function to check if an error is a 406 error
   const is406Error = (error: any) => {
@@ -159,6 +167,35 @@ export default function AdminDashboard() {
     setError(null);
 
     try {
+      // Fetch event data to get votes_active status and name
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('votes_active, name')
+        .eq('id', eventId)
+        .single();
+        
+      if (eventError) {
+        console.error('Error fetching event:', eventError);
+        setError('Error fetching event data');
+      } else if (eventData) {
+        setVotingActive(eventData.votes_active || false);
+        setEventName(eventData.name || "Unnamed Event");
+      }
+
+      // Fetch all projects for this event
+      const { data: projectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, name, description')
+        .eq('event_id', eventId)
+        .order('name');
+        
+      if (projectsError) {
+        console.error('Error fetching projects:', projectsError);
+        setError('Error fetching projects');
+      } else {
+        setProjects(projectsData || []);
+      }
+
       // First fetch all participants
       const { data: participantsData, error: participantsError } = await supabase
         .from('event_participants')
@@ -763,6 +800,143 @@ export default function AdminDashboard() {
     }
   };
 
+  const toggleVotingStatus = async () => {
+    const supabase = createClient();
+    setError(null);
+    setUpdatingVoteStatus(true);
+    
+    try {
+      const newVotingStatus = !votingActive;
+      
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({ votes_active: newVotingStatus })
+        .eq('id', eventId);
+        
+      if (updateError) {
+        console.error('Error updating voting status:', updateError);
+        setError(`Failed to ${newVotingStatus ? 'activate' : 'deactivate'} voting`);
+        return;
+      }
+      
+      setVotingActive(newVotingStatus);
+    } catch (err) {
+      console.error('Unexpected error toggling voting status:', err);
+      setError('An unexpected error occurred while updating voting status');
+    } finally {
+      setUpdatingVoteStatus(false);
+    }
+  };
+
+  const handleAddProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProject.name.trim()) return;
+    
+    setProjectActionLoading(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      const { data, error } = await supabase
+        .from('projects')
+        .insert({
+          event_id: eventId,
+          name: newProject.name.trim(),
+          description: newProject.description.trim() || null
+        })
+        .select('id')
+        .single();
+        
+      if (error) {
+        console.error('Error adding project:', error);
+        setError('Failed to add project');
+        return;
+      }
+      
+      // Refresh projects list
+      fetchData();
+      
+      // Reset form
+      setNewProject({ name: "", description: "" });
+    } catch (err) {
+      console.error('Unexpected error adding project:', err);
+      setError('An unexpected error occurred while adding project');
+    } finally {
+      setProjectActionLoading(false);
+    }
+  };
+  
+  const handleEditProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProject || !editingProject.name.trim()) return;
+    
+    setProjectActionLoading(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          name: editingProject.name.trim(),
+          description: editingProject.description.trim() || null
+        })
+        .eq('id', editingProject.id);
+        
+      if (error) {
+        console.error('Error updating project:', error);
+        setError('Failed to update project');
+        return;
+      }
+      
+      // Refresh projects list
+      fetchData();
+      
+      // Cancel editing mode
+      setEditingProject(null);
+    } catch (err) {
+      console.error('Unexpected error updating project:', err);
+      setError('An unexpected error occurred while updating project');
+    } finally {
+      setProjectActionLoading(false);
+    }
+  };
+  
+  const handleDeleteProject = async () => {
+    if (!projectToDelete) return;
+    
+    setProjectActionLoading(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectToDelete);
+        
+      if (error) {
+        console.error('Error deleting project:', error);
+        setError('Failed to delete project');
+        return;
+      }
+      
+      // Refresh projects list
+      fetchData();
+      
+      // Reset deletion state
+      setProjectToDelete(null);
+    } catch (err) {
+      console.error('Unexpected error deleting project:', err);
+      setError('An unexpected error occurred while deleting project');
+    } finally {
+      setProjectActionLoading(false);
+    }
+  };
+
   if (!isAuthorized) {
     return null;
   }
@@ -773,7 +947,31 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-4 max-w-4xl mx-auto space-y-8">
-      <h1 className="text-brand-blue font-eyebrow text-4xl">Admin Dashboard</h1>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-brand-blue font-eyebrow text-4xl">{eventName}</h1>
+          <p className="text-gray-500 text-sm mt-1">Admin Dashboard</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={`text-sm font-medium ${votingActive ? 'text-green-600' : 'text-gray-600'}`}>
+            Voting is {votingActive ? 'Active' : 'Inactive'}
+          </span>
+          <button
+            onClick={toggleVotingStatus}
+            disabled={updatingVoteStatus}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              votingActive 
+                ? 'bg-red-100 text-red-800 hover:bg-red-200' 
+                : 'bg-green-100 text-green-800 hover:bg-green-200'
+            } disabled:opacity-50`}
+          >
+            {updatingVoteStatus 
+              ? 'Updating...' 
+              : (votingActive ? 'Deactivate Voting' : 'Activate Voting')
+            }
+          </button>
+        </div>
+      </div>
       
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
@@ -797,6 +995,171 @@ export default function AdminDashboard() {
       )}
       
       <div className="space-y-6">
+        {/* Projects Management Section */}
+        <div className="space-y-4">
+          <h2 className="text-brand-blue font-eyebrow text-2xl">Projects</h2>
+          
+          {/* Projects List */}
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {projects.map((project) => (
+                  <tr key={project.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {editingProject?.id === project.id ? (
+                        <input
+                          type="text"
+                          value={editingProject.name}
+                          onChange={(e) => setEditingProject({...editingProject, name: e.target.value})}
+                          className="w-full px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                        />
+                      ) : (
+                        project.name || "Unnamed Project"
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {editingProject?.id === project.id ? (
+                        <textarea
+                          value={editingProject.description || ""}
+                          onChange={(e) => setEditingProject({...editingProject, description: e.target.value})}
+                          rows={2}
+                          className="w-full px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                        />
+                      ) : (
+                        <div className="line-clamp-2">
+                          {project.description || "No description"}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                      {editingProject?.id === project.id ? (
+                        <>
+                          <button
+                            onClick={handleEditProject}
+                            disabled={projectActionLoading}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingProject(null)}
+                            disabled={projectActionLoading}
+                            className="text-gray-600 hover:text-gray-900"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setEditingProject({
+                              id: project.id,
+                              name: project.name || "",
+                              description: project.description || ""
+                            })}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setProjectToDelete(project.id)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {projects.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-6 py-4 text-center text-sm text-gray-500">
+                      No projects found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* Add New Project Form */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Add New Project</h3>
+            <form onSubmit={handleAddProject} className="space-y-4">
+              <div>
+                <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">
+                  Project Name *
+                </label>
+                <input
+                  type="text"
+                  id="projectName"
+                  value={newProject.name}
+                  onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue"
+                  placeholder="Enter project name"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="projectDescription" className="block text-sm font-medium text-gray-700">
+                  Description
+                </label>
+                <textarea
+                  id="projectDescription"
+                  value={newProject.description}
+                  onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+                  rows={3}
+                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-brand-blue focus:border-brand-blue"
+                  placeholder="Enter project description"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={projectActionLoading || !newProject.name.trim()}
+                className="px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-50"
+              >
+                {projectActionLoading ? 'Adding...' : 'Add Project'}
+              </button>
+            </form>
+          </div>
+        </div>
+        
+        {/* Deletion Confirmation Modal */}
+        {projectToDelete && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Confirm Deletion</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this project? This action cannot be undone and will remove all votes associated with this project.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setProjectToDelete(null)}
+                  disabled={projectActionLoading}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteProject}
+                  disabled={projectActionLoading}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {projectActionLoading ? 'Deleting...' : 'Delete Project'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <div className="space-y-4">
           <h2 className="text-brand-blue font-eyebrow text-2xl">Event Participants</h2>
           <div className="bg-white rounded-lg shadow overflow-hidden">
