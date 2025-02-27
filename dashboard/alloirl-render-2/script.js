@@ -129,11 +129,12 @@ function generateTimeSlots() {
     });
 }
 
-// Replace generateData function with:
+// Modify the generateData function to sort projects based on the currency parameter
 async function generateData(npl, dims, isIncremental = false) {
     // Get the event ID from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const eventId = urlParams.get('eventId') || 'd7a18f34-c7a8-499b-be2a-ca0316c9a680'; // Default event ID
+    const showCurrency = shouldShowCurrency();
     
     try {
         // Use the fetchEventData function from supabase.js
@@ -162,7 +163,7 @@ async function generateData(npl, dims, isIncremental = false) {
                 contributionAmount: contributionAmount,
                 numberContributions: numberContributions
             };
-        }).sort((a, b) => b.matchingAmount - a.matchingAmount); // Sort by matching amount
+        });
         
         // Create attendees (use CONFIG.attendees.count)
         const attendees = Array.from({ length: CONFIG.attendees.count }, (_, i) => {
@@ -226,6 +227,15 @@ async function generateData(npl, dims, isIncremental = false) {
             }
         });
         
+        // Sort projects based on the currency parameter
+        if (showCurrency) {
+            // Sort by matching amount
+            projects.sort((a, b) => b.matchingAmount - a.matchingAmount);
+        } else {
+            // Sort by vote count
+            projects.sort((a, b) => b.votes.length - a.votes.length);
+        }
+        
         return {
             timeSlots,
             projects,
@@ -234,13 +244,7 @@ async function generateData(npl, dims, isIncremental = false) {
     }
 }
 
-/**
- * Creates the visualization
- * @param {Object} data - The dataset to visualize
- * @param {Object} config - Configuration options
- * @param {Object} dims - Visualization dimensions
- * @param {boolean} isFullRedraw - Whether this is a full redraw or an incremental update
- */
+// Modify the createVisualization function to sort projects based on the currency parameter
 function createVisualization(data, config, dims, isFullRedraw = true) {
     // Filter out attendees with no transactions
     data.attendees = data.attendees.filter(attendee => attendee.votes.length > 0);
@@ -259,6 +263,16 @@ function createVisualization(data, config, dims, isFullRedraw = true) {
             }
         });
     });
+    
+    // Sort projects based on the currency parameter
+    const showCurrency = shouldShowCurrency();
+    if (showCurrency) {
+        // Sort by matching amount
+        data.projects.sort((a, b) => b.matchingAmount - a.matchingAmount);
+    } else {
+        // Sort by vote count
+        data.projects.sort((a, b) => b.votes.length - a.votes.length);
+    }
     
     // Store the current data for future updates
     currentData = data;
