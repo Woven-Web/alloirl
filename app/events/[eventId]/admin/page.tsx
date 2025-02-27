@@ -43,7 +43,6 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [schemaInfo, setSchemaInfo] = useState<string | null>(null);
   const [has406Error, setHas406Error] = useState(false);
   const [votingActive, setVotingActive] = useState(false);
   const [updatingVoteStatus, setUpdatingVoteStatus] = useState(false);
@@ -89,7 +88,6 @@ export default function AdminDashboard() {
       if (tableError) {
         // Check if it's a 406 Not Acceptable error
         if (handle406Error(tableError, 'schema check')) {
-          setSchemaInfo(`The event_allowlist table exists, but there was a content negotiation issue. The app will still work normally.`);
           return true;
         }
         
@@ -97,21 +95,16 @@ export default function AdminDashboard() {
         if (tableError.code === '42501' || 
             (tableError.message && tableError.message.includes('violates row-level security policy'))) {
           console.log('Table exists but RLS policy prevents direct access');
-          setSchemaInfo(`The event_allowlist table exists, but you may have limited access due to security policies. The app will still work, but some operations may require additional permissions.`);
           return true;
         }
         
         console.error('Error checking event_allowlist table:', tableError);
-        setSchemaInfo(`Table check error: ${tableError.message}`);
         return false;
       }
       
-      // Since you confirmed has_registered exists, we'll skip the column check
-      setSchemaInfo(`Table exists and has_registered column is available.`);
       return true;
     } catch (err) {
       console.error('Unexpected error checking schema:', err);
-      setSchemaInfo(`Schema check exception: ${err instanceof Error ? err.message : String(err)}`);
       return false;
     }
   };
@@ -308,7 +301,6 @@ export default function AdminDashboard() {
           if (handle406Error(allowlistError, 'fetching allowlist')) {
             // Try to continue with the operation - the app can still function
             setAllowlist([]);
-            setSchemaInfo(`There was a content negotiation issue when fetching the allowlist. The app will still work, but the allowlist may not display correctly.`);
             return;
           }
           
@@ -339,7 +331,6 @@ export default function AdminDashboard() {
               if (handle406Error(basicAllowlistError, 'fetching basic allowlist')) {
                 // Try to continue with the operation - the app can still function
                 setAllowlist([]);
-                setSchemaInfo(`There was a content negotiation issue when fetching the allowlist. The app will still work, but the allowlist may not display correctly.`);
                 return;
               }
               
@@ -1227,13 +1218,6 @@ export default function AdminDashboard() {
           <p className="font-medium">Content Negotiation Warning:</p>
           <p>Some operations are encountering 406 (Not Acceptable) errors. This is likely due to a content type mismatch between the client and server.</p>
           <p>The application will continue to function, but some features may not work as expected. This is a technical issue that doesn't affect your data.</p>
-        </div>
-      )}
-      
-      {schemaInfo && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded text-sm">
-          <p className="font-medium">Database Schema Info:</p>
-          <p>{schemaInfo}</p>
         </div>
       )}
       
