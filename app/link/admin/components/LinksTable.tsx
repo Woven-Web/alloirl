@@ -201,7 +201,7 @@ const LinksTable = ({ initialLinks = [], projects, events }: LinksTableProps) =>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 <div className="relative">
                   <Select
-                    value={link.project?.id || link.event?.id || ""}
+                    value={link.project ? `project_${link.project.id}` : link.event ? `event_${link.event.id}` : ""}
                     onValueChange={(newValue) => {
                       // Determine if this is a project or event ID
                       const isProject = newValue.startsWith('project_');
