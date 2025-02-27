@@ -1,6 +1,6 @@
 // Remove the Supabase import since we're using fake data
 // import { fetchEventData, subscribeToProjectAllocations } from './supabase.js';
-import { fetchEventData, subscribeToProjectAllocations } from './supabase.js';
+import { fetchEventData, subscribeToProjectAllocations, getEventTimingInfo, updateEventTimingInfo } from './supabase.js';
 
 // Configuration object for the visualization
 export const CONFIG = {
@@ -27,8 +27,8 @@ export const CONFIG = {
     },
     time: {
         interval: 15,     // minutes between time slots
-        eventDuration: 6, // duration in hours (changed from 5 to 4 to end at 9PM)
-        startHour: 11, // 24h format
+        eventDuration: 6, // duration in hours (will be overridden by event data)
+        startHour: 11,    // 24h format (will be overridden by event data)
         format: (time) => {
             // Custom format to show "10 PM", "11 PM", etc.
             const hours = time.getHours();
@@ -56,6 +56,9 @@ export const CONFIG = {
         adaptiveSpeed: false// Adjust speed based on total height
     }
 };
+
+// Share the interval setting with supabase.js
+updateEventTimingInfo(CONFIG);
 
 // Calculate actual drawing dimensions
 const DIMS = {
@@ -87,18 +90,22 @@ let currentData = null;
 // Calculate event timing parameters
 function getEventTiming() {
     const now = new Date();
-    now.setMinutes(Math.floor(now.getMinutes() / CONFIG.time.interval) * CONFIG.time.interval);
+    const { interval } = getEventTimingInfo();
+    now.setMinutes(Math.floor(now.getMinutes() / interval) * interval);
     now.setSeconds(0);
     now.setMilliseconds(0);
 
+    // Get the dynamic values from event data
+    const { startHour, eventDuration } = getEventTimingInfo();
+    
     // Set event start to configured hour
     const eventStart = new Date(now);
-    eventStart.setHours(CONFIG.time.startHour);
+    eventStart.setHours(startHour);
     eventStart.setMinutes(0);
     
-    // Event end is 6 hours after event start
+    // Event end is based on the event duration from the database
     const eventEnd = new Date(eventStart);
-    eventEnd.setHours(eventStart.getHours() + CONFIG.time.eventDuration);
+    eventEnd.setHours(eventStart.getHours() + eventDuration);
 
     return {
         eventStart,
@@ -113,11 +120,12 @@ function getEventTiming() {
  */
 function generateTimeSlots() {
     const { eventStart, eventEnd, currentTime } = getEventTiming();
-    const totalSlots = (CONFIG.time.eventDuration * 60) / CONFIG.time.interval;
+    const { eventDuration, interval } = getEventTimingInfo();
+    const totalSlots = (eventDuration * 60) / interval;
     
     return Array.from({ length: totalSlots }, (_, i) => {
         const time = new Date(eventStart);
-        time.setMinutes(time.getMinutes() + (CONFIG.time.interval * i));
+        time.setMinutes(time.getMinutes() + (interval * i));
         
         return {
             timestamp: time,
@@ -526,7 +534,7 @@ function updateConnections() {
         const timePosition = (slot.timestamp.getTime() - firstSlotTime) / timeRange;
         
         // Calculate stroke width based on time position
-        const minStrokeWidth = 0.1;
+        const minStrokeWidth = 0.4;
         const maxStrokeWidth = 0.8;
         const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
         
@@ -850,7 +858,7 @@ function drawConnections(svg, data, timeScale, projectPositions) {
         // Calculate stroke width based on time position
         // Older connections (lower timePosition) get thinner strokes
         // Newer connections (higher timePosition) get thicker strokes
-        const minStrokeWidth = 0.1;
+        const minStrokeWidth = 0.4;
         const maxStrokeWidth = 0.8;
         const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
         
@@ -1116,6 +1124,13 @@ async function incrementalUpdate() {
     // Initial full render
     await updateVisualization(true);
     
+    // Log the event timing information
+    const { startHour, eventDuration } = getEventTimingInfo();
+    console.log(`Using event timing: startHour=${startHour}, duration=${eventDuration}h`);
+    
+    // Update the event header with timing info
+    updateEventHeader();
+    
     // Set up animation control button
     const animationControl = document.getElementById('animation-control');
     if (animationControl) {
@@ -1326,7 +1341,7 @@ function drawSingleConnection(voteId, projectId, timeSlot, yPosition) {
     const timePosition = (timeSlot.timestamp.getTime() - firstSlotTime) / timeRange;
     
     // Calculate stroke width based on time position
-    const minStrokeWidth = 0.1;
+    const minStrokeWidth = 0.4;
     const maxStrokeWidth = 0.8;
     const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
     
