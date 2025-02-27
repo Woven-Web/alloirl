@@ -4,6 +4,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
+import Link from "next/link";
 
 interface EventParticipant {
   id: string;
@@ -949,8 +950,10 @@ export default function AdminDashboard() {
     <div className="p-4 max-w-4xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-brand-blue font-eyebrow text-4xl">{eventName}</h1>
-          <p className="text-gray-500 text-sm mt-1">Admin Dashboard</p>
+          <Link href={`/events/${eventId}`} className="group">
+            <h1 className="text-brand-blue font-eyebrow text-4xl group-hover:underline">{eventName}</h1>
+            <p className="text-gray-500 text-sm mt-1">Admin Dashboard</p>
+          </Link>
         </div>
         <div className="flex items-center gap-3">
           <span className={`text-sm font-medium ${votingActive ? 'text-green-600' : 'text-gray-600'}`}>
