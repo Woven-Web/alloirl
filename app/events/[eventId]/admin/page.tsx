@@ -54,6 +54,14 @@ export default function AdminDashboard() {
   const [isEditingFundingPool, setIsEditingFundingPool] = useState(false);
   const [tempFundingPool, setTempFundingPool] = useState<string>("");
   const [updatingFundingPool, setUpdatingFundingPool] = useState(false);
+  const [startDate, setStartDate] = useState<string | null>(null);
+  const [isEditingStartDate, setIsEditingStartDate] = useState(false);
+  const [tempStartDate, setTempStartDate] = useState<string>("");
+  const [updatingStartDate, setUpdatingStartDate] = useState(false);
+  const [endDate, setEndDate] = useState<string | null>(null);
+  const [isEditingEndDate, setIsEditingEndDate] = useState(false);
+  const [tempEndDate, setTempEndDate] = useState<string>("");
+  const [updatingEndDate, setUpdatingEndDate] = useState(false);
   const [projects, setProjects] = useState<Array<{id: string, name: string | null, description: string | null}>>([]);
   const [newProject, setNewProject] = useState({ name: "", description: "" });
   const [editingProject, setEditingProject] = useState<{ id: string, name: string, description: string } | null>(null);
@@ -197,7 +205,7 @@ export default function AdminDashboard() {
       // Fetch event data to get votes_active status, name, and funding_pool
       const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select('votes_active, name, funding_pool')
+        .select('votes_active, name, funding_pool, start_date, end_date')
         .eq('id', eventId)
         .single();
         
@@ -211,6 +219,15 @@ export default function AdminDashboard() {
         setTempEventName(eventNameValue);
         setFundingPool(eventData.funding_pool);
         setTempFundingPool(eventData.funding_pool?.toString() || "");
+        
+        // Format the dates if they exist
+        const formattedStartDate = eventData.start_date ? new Date(eventData.start_date).toISOString().slice(0, 16) : null;
+        const formattedEndDate = eventData.end_date ? new Date(eventData.end_date).toISOString().slice(0, 16) : null;
+        
+        setStartDate(formattedStartDate);
+        setTempStartDate(formattedStartDate || "");
+        setEndDate(formattedEndDate);
+        setTempEndDate(formattedEndDate || "");
       }
 
       // Fetch all projects for this event
@@ -1077,6 +1094,70 @@ export default function AdminDashboard() {
     }
   };
 
+  // Add a function to handle updating the start date
+  const handleUpdateStartDate = async () => {
+    setUpdatingStartDate(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('events')
+        .update({ start_date: tempStartDate || null })
+        .eq('id', eventId);
+        
+      if (error) {
+        console.error('Error updating start date:', error);
+        setError('Failed to update start date');
+        return;
+      }
+      
+      // Update the local state
+      setStartDate(tempStartDate);
+      
+      // Exit editing mode
+      setIsEditingStartDate(false);
+    } catch (err) {
+      console.error('Unexpected error updating start date:', err);
+      setError('An unexpected error occurred while updating start date');
+    } finally {
+      setUpdatingStartDate(false);
+    }
+  };
+
+  // Add a function to handle updating the end date
+  const handleUpdateEndDate = async () => {
+    setUpdatingEndDate(true);
+    setError(null);
+    
+    try {
+      const supabase = createClient();
+      
+      const { error } = await supabase
+        .from('events')
+        .update({ end_date: tempEndDate || null })
+        .eq('id', eventId);
+        
+      if (error) {
+        console.error('Error updating end date:', error);
+        setError('Failed to update end date');
+        return;
+      }
+      
+      // Update the local state
+      setEndDate(tempEndDate);
+      
+      // Exit editing mode
+      setIsEditingEndDate(false);
+    } catch (err) {
+      console.error('Unexpected error updating end date:', err);
+      setError('An unexpected error occurred while updating end date');
+    } finally {
+      setUpdatingEndDate(false);
+    }
+  };
+
   if (!isAuthorized) {
     return null;
   }
@@ -1201,6 +1282,100 @@ export default function AdminDashboard() {
                 className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
               >
                 Edit Amount
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* Start Date section */}
+        <div className="flex items-center mt-2">
+          <span className="mr-3 text-sm font-medium text-gray-700">Start Date:</span>
+          {isEditingStartDate ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                value={tempStartDate}
+                onChange={(e) => setTempStartDate(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                autoFocus
+              />
+              <button
+                onClick={handleUpdateStartDate}
+                disabled={updatingStartDate}
+                className="px-3 py-1 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-50 text-sm"
+              >
+                {updatingStartDate ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditingStartDate(false);
+                  setTempStartDate(startDate || ""); // Reset to current date
+                }}
+                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold">
+                {startDate ? new Date(startDate).toLocaleString() : "Not set"}
+              </span>
+              <button
+                onClick={() => {
+                  setIsEditingStartDate(true);
+                  setTempStartDate(startDate || "");
+                }}
+                className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
+                Edit Date
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* End Date section */}
+        <div className="flex items-center mt-2">
+          <span className="mr-3 text-sm font-medium text-gray-700">End Date:</span>
+          {isEditingEndDate ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                value={tempEndDate}
+                onChange={(e) => setTempEndDate(e.target.value)}
+                className="px-3 py-1 border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                autoFocus
+              />
+              <button
+                onClick={handleUpdateEndDate}
+                disabled={updatingEndDate}
+                className="px-3 py-1 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-50 text-sm"
+              >
+                {updatingEndDate ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => {
+                  setIsEditingEndDate(false);
+                  setTempEndDate(endDate || ""); // Reset to current date
+                }}
+                className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold">
+                {endDate ? new Date(endDate).toLocaleString() : "Not set"}
+              </span>
+              <button
+                onClick={() => {
+                  setIsEditingEndDate(true);
+                  setTempEndDate(endDate || "");
+                }}
+                className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700 hover:bg-gray-200"
+              >
+                Edit Date
               </button>
             </div>
           )}
