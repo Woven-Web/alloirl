@@ -27,6 +27,7 @@ interface EventParticipation {
   events: {
     id: string;
     name: string;
+    votes_active: boolean;
   };
 }
 
@@ -68,7 +69,7 @@ export default function ProfilePage() {
         .eq('user_id', user.id)
         .gt('votes', 0)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(20);
 
       // Fetch event participations
       const { data: participationsData } = await supabase
@@ -78,7 +79,8 @@ export default function ProfilePage() {
           available_votes,
           events (
             id,
-            name
+            name,
+            votes_active
           )
         `)
         .eq('user_id', user.id);
@@ -103,6 +105,10 @@ export default function ProfilePage() {
 
     fetchProfileData();
   }, []);
+
+  // Split participations into active and past rounds
+  const activeRounds = participations.filter(p => p.events.votes_active);
+  const pastRounds = participations.filter(p => !p.events.votes_active);
 
   if (loading) {
     return <div className="p-4">Loading...</div>;
@@ -143,9 +149,9 @@ export default function ProfilePage() {
 
       <section className="space-y-4">
         <h2 className="text-xl font-semibold text-brand-blue">Active Rounds</h2>
-        {participations.length > 0 ? (
+        {activeRounds.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
-            {participations.map((participation) => (
+            {activeRounds.map((participation) => (
               <Link
                 key={participation.id}
                 href={`/events/${participation.events.id}`}
@@ -159,7 +165,29 @@ export default function ProfilePage() {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500">Not participating in any rounds</p>
+          <p className="text-gray-500">No active rounds</p>
+        )}
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-xl font-semibold text-brand-blue">Past Rounds</h2>
+        {pastRounds.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {pastRounds.map((participation) => (
+              <Link
+                key={participation.id}
+                href={`/events/${participation.events.id}`}
+                className="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow"
+              >
+                <div className="font-medium">{participation.events.name}</div>
+                <div className="text-sm text-gray-500">
+                  {participation.available_votes} votes remaining
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500">No past rounds</p>
         )}
       </section>
     </div>
