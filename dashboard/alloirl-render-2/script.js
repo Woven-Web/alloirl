@@ -512,8 +512,8 @@ function updateConnections() {
         const timePosition = (slot.timestamp.getTime() - firstSlotTime) / timeRange;
         
         // Calculate stroke width based on time position
-        const minStrokeWidth = 0.5;
-        const maxStrokeWidth = 2.0;
+        const minStrokeWidth = 0.1;
+        const maxStrokeWidth = 0.8;
         const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
         
         slot.votes.forEach(vote => {
@@ -821,8 +821,8 @@ function drawConnections(svg, data, timeScale, projectPositions) {
         // Calculate stroke width based on time position
         // Older connections (lower timePosition) get thinner strokes
         // Newer connections (higher timePosition) get thicker strokes
-        const minStrokeWidth = 0.5;
-        const maxStrokeWidth = 2.0;
+        const minStrokeWidth = 0.1;
+        const maxStrokeWidth = 0.8;
         const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
         
         slot.votes.forEach(vote => {
@@ -1075,7 +1075,7 @@ async function updateVisualization(isFullRedraw = true) {
  * Only updates projects and their connections
  */
 async function incrementalUpdate() {
-    await updateVisualization(false);
+    await updateVisualization(true);
 }
 
 // Initial render needs to be async too:
@@ -1100,7 +1100,7 @@ async function incrementalUpdate() {
     }
     
     // Set up test data button (for development only)
-    setupTestDataButton(eventId);
+    // setupTestDataButton(eventId);
     
     // Subscribe to project allocations for real-time updates
     console.log(`Setting up subscription for event ID: ${eventId}`);
@@ -1297,8 +1297,8 @@ function drawSingleConnection(voteId, projectId, timeSlot, yPosition) {
     const timePosition = (timeSlot.timestamp.getTime() - firstSlotTime) / timeRange;
     
     // Calculate stroke width based on time position
-    const minStrokeWidth = 0.5;
-    const maxStrokeWidth = 2.0;
+    const minStrokeWidth = 0.1;
+    const maxStrokeWidth = 0.8;
     const strokeWidth = minStrokeWidth + (timePosition * (maxStrokeWidth - minStrokeWidth));
     
     // Calculate point radius based on time position
@@ -1522,7 +1522,9 @@ function updateIntersections() {
                 .attr("id", intersection.id)
                 .attr("class", `intersection-dot ${intersection.isPast ? 'past' : 'future'}`)
                 .attr("cx", intersection.x)
-                .attr("cy", intersection.y);
+                .attr("cy", intersection.y)
+                // Set the radius directly as an attribute instead of via CSS
+                .attr("r", intersection.isPast ? 3 : 2);
         }
     });
 }
@@ -1561,7 +1563,9 @@ function drawIntersections(svg, data, timeScale) {
         .attr('id', d => d.id)
         .attr('class', d => `intersection-dot ${d.isPast ? 'past' : 'future'}`)
         .attr('cx', d => d.x)
-        .attr('cy', d => d.y);
+        .attr('cy', d => d.y)
+        // Set the radius directly as an attribute instead of via CSS
+        .attr('r', d => d.isPast ? 3 : 2);
 }
 
 /**

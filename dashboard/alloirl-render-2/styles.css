@@ -385,28 +385,23 @@ body {
 /* Intersection dot styles */
 .intersection-dot {
   /* Common styling for intersection dots */
-  transition: r 0.2s ease;
+  transition: all 0.2s ease; /* Changed from r to all */
   stroke: #0001B2;
-  /* stroke-width: 2px; */
-  /* stroke-width: 8px; */
-  r: 4;
-  z-index: 50;
+  /* Remove r property from here */
 }
 
 .intersection-dot.past {
   fill: #F3FD8B;
   stroke: #0001B2;
   stroke-width: 2px;
-  r: 3;
-  z-index: 50;
+  /* Remove r property from here */
 }
 
 .intersection-dot.future {
   fill: none;
   stroke: rgba(255, 255, 255, 0.6);
   stroke-width: 0.5px;
-  r: 2;
-  z-index: 50;
+  /* Remove r property from here */
 }
 
 /* Emoji rain animation styles */

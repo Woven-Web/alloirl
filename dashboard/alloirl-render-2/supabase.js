@@ -351,12 +351,12 @@ export function subscribeToProjectAllocations(eventId, onUpdate) {
                 onUpdate();
                 
                 // Then force a complete redraw of connections
-                setTimeout(() => {
-                    // Clear existing connections and redraw them completely
-                    if (window.forceConnectionsRedraw && typeof window.forceConnectionsRedraw === 'function') {
-                        window.forceConnectionsRedraw();
-                    }
-                }, 300);
+                // setTimeout(() => {
+                //     // Clear existing connections and redraw them completely
+                //     if (window.forceConnectionsRedraw && typeof window.forceConnectionsRedraw === 'function') {
+                //         window.forceConnectionsRedraw();
+                //     }
+                // }, 300);
             }, 100);
         })
         .subscribe();
@@ -382,12 +382,12 @@ export function subscribeToProjectAllocations(eventId, onUpdate) {
                 onUpdate();
                 
                 // Then force a complete redraw of connections
-                setTimeout(() => {
-                    // Clear existing connections and redraw them completely
-                    if (window.forceConnectionsRedraw && typeof window.forceConnectionsRedraw === 'function') {
-                        window.forceConnectionsRedraw();
-                    }
-                }, 300);
+                // setTimeout(() => {
+                //     // Clear existing connections and redraw them completely
+                //     if (window.forceConnectionsRedraw && typeof window.forceConnectionsRedraw === 'function') {
+                //         window.forceConnectionsRedraw();
+                //     }
+                // }, 300);
             }, 100);
         })
         .subscribe();
