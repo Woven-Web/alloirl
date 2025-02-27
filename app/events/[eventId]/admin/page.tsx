@@ -220,13 +220,14 @@ export default function AdminDashboard() {
         setFundingPool(eventData.funding_pool);
         setTempFundingPool(eventData.funding_pool?.toString() || "");
         
-        // Format the dates if they exist
+        // Format the dates if they exist - preserve exact time in local timezone
         const formattedStartDate = eventData.start_date ? new Date(eventData.start_date).toISOString().slice(0, 16) : null;
         const formattedEndDate = eventData.end_date ? new Date(eventData.end_date).toISOString().slice(0, 16) : null;
         
-        setStartDate(formattedStartDate);
+        // Store the original date strings from Supabase to preserve timezone information
+        setStartDate(eventData.start_date);
         setTempStartDate(formattedStartDate || "");
-        setEndDate(formattedEndDate);
+        setEndDate(eventData.end_date);
         setTempEndDate(formattedEndDate || "");
       }
 
@@ -591,7 +592,6 @@ export default function AdminDashboard() {
                   continue;
                 }
               }
-              // If no entries found, continue to create a new one
             } else 
             // If the error is about the has_registered column not existing, we'll handle it differently
             if (allowlistCheckError.message?.includes('has_registered') || 
@@ -1102,9 +1102,20 @@ export default function AdminDashboard() {
     try {
       const supabase = createClient();
       
+      // Create a date object from the input value
+      let dateToSave = null;
+      if (tempStartDate) {
+        // For datetime-local inputs, we need to handle timezone conversion
+        // The input gives us a local time without timezone info
+        const localDate = new Date(tempStartDate);
+        
+        // Convert to UTC ISO string for storage
+        dateToSave = localDate.toISOString();
+      }
+      
       const { error } = await supabase
         .from('events')
-        .update({ start_date: tempStartDate || null })
+        .update({ start_date: dateToSave })
         .eq('id', eventId);
         
       if (error) {
@@ -1113,8 +1124,8 @@ export default function AdminDashboard() {
         return;
       }
       
-      // Update the local state
-      setStartDate(tempStartDate);
+      // Update the local state with the ISO string
+      setStartDate(dateToSave);
       
       // Exit editing mode
       setIsEditingStartDate(false);
@@ -1134,9 +1145,20 @@ export default function AdminDashboard() {
     try {
       const supabase = createClient();
       
+      // Create a date object from the input value
+      let dateToSave = null;
+      if (tempEndDate) {
+        // For datetime-local inputs, we need to handle timezone conversion
+        // The input gives us a local time without timezone info
+        const localDate = new Date(tempEndDate);
+        
+        // Convert to UTC ISO string for storage
+        dateToSave = localDate.toISOString();
+      }
+      
       const { error } = await supabase
         .from('events')
-        .update({ end_date: tempEndDate || null })
+        .update({ end_date: dateToSave })
         .eq('id', eventId);
         
       if (error) {
@@ -1145,8 +1167,8 @@ export default function AdminDashboard() {
         return;
       }
       
-      // Update the local state
-      setEndDate(tempEndDate);
+      // Update the local state with the ISO string
+      setEndDate(dateToSave);
       
       // Exit editing mode
       setIsEditingEndDate(false);
@@ -1319,7 +1341,14 @@ export default function AdminDashboard() {
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-lg font-semibold">
-                {startDate ? new Date(startDate).toLocaleString() : "Not set"}
+                {startDate ? new Date(startDate).toLocaleString(undefined, {
+                  year: 'numeric',
+                  month: 'numeric',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: 'numeric',
+                  hour12: true
+                }) : "Not set"}
               </span>
               <button
                 onClick={() => {
@@ -1366,7 +1395,14 @@ export default function AdminDashboard() {
           ) : (
             <div className="flex items-center gap-2">
               <span className="text-lg font-semibold">
-                {endDate ? new Date(endDate).toLocaleString() : "Not set"}
+                {endDate ? new Date(endDate).toLocaleString(undefined, {
+                  year: 'numeric',
+                  month: 'numeric',
+                  day: 'numeric',
+                  hour: 'numeric',
+                  minute: 'numeric',
+                  hour12: true
+                }) : "Not set"}
               </span>
               <button
                 onClick={() => {
