@@ -1,0 +1,456 @@
+body, button, input {
+  font-family: 'DM Mono', ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace;
+}
+
+body {
+  background: #0001B2;
+  margin: 0;
+  padding: 0;
+  color: #fff;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+}
+
+.header-row {
+  display: flex;
+  height: 60px;
+  border-bottom: 2px solid #F3FD8B;
+  font-size: 18px;
+  font-weight: 300;
+  color: #F3FD8B;
+  align-items: center;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0;
+  margin: 0;
+  z-index: 10; /* Ensure header stays above scrolling content */
+}
+
+.header-attendee {
+  width: 250px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.header-credits {
+  width: 180px;
+  padding-right: 24px;
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.header-timeline {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  position: relative;
+  overflow: visible;
+  min-height: 60px;
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.header-projects {
+  font-size: 18px;
+  font-weight: 500;
+  width: 335px;
+  padding: 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60px;
+  line-height: 60px;
+}
+
+.header-attendee, .header-timeline, .header-projects {
+  border: none;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  position: relative;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.attendees-column {
+  width: 300px;
+  /* border-right: 1px solid rgba(255, 255, 255, 0.1); */
+  padding: 0;
+  margin: 0;
+  overflow: hidden; /* Changed from overflow-y: auto to hidden */
+  height: 100%;
+  position: relative; /* Added for absolute positioning of children */
+}
+
+.attendees-scroll-container {
+  width: 100%;
+  position: relative;
+}
+
+.timeline-column {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  overflow: hidden; /* Ensure no scrollbars appear */
+  /* background: #000; */
+}
+
+.projects-column {
+  width: 320px;
+  /* border-left: 1px solid rgba(255, 255, 255, 0.1); */
+  padding: 15px;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  /* background: #000033; */
+  overflow-y: auto;
+}
+
+.project {
+  border-radius: 8px;
+  border: 2px solid #F3FD8B;
+  overflow: hidden;
+}
+
+.project-header {
+  color: #0001B2;
+  background: #F3FD8B;
+  padding: 8px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  line-height: 1;
+}
+
+.footer {
+  height: 50px; 
+  display: none;
+  /* background: #F3FD8B; */
+  background: transparent;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10; /* Ensure footer stays above scrolling content */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-header-left {
+  font-size: 30px;
+  font-weight: 700;
+}
+
+.project-header-right {
+  font-size: 22px;
+  font-weight: 500;
+  text-align: right;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.project-content {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.project-name {
+  color: #F3FD8B;
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.project-path {
+  color: #F3FD8B;
+  opacity: 0.7;
+  font-size: 16px;
+  font-family: 'DM Mono', monospace;
+}
+
+.project-interactions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.interaction-button {
+  background: #F3FD8B;
+  color: #0001B2;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 16px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+#visualization {
+  width: 100%;
+  height: 100%;
+}
+
+#visualization svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.control-panel {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid #333;
+  padding: 10px;
+  border-radius: 4px;
+  z-index: 1000;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 5px 0;
+}
+
+.control-button {
+  background: #333;
+  border: 1px solid #555;
+  color: #fff;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.control-button:hover {
+  background: #444;
+}
+
+.control-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.time-marker {
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 1;
+}
+
+.time-marker.future {
+  stroke-dasharray: 2 2;
+  stroke-opacity: 1;
+  /* stroke-width: 1px; */
+}
+
+.hour-line {
+  stroke: #F3FD8B;
+  stroke-width: 0.5px;
+  stroke-opacity: 1;
+}
+
+.current-time-indicator {
+  stroke: #F3FD8B;
+  stroke-width: 2px;
+}
+
+.connection {
+  stroke: #F3FD8B;
+  z-index: 100;
+  fill: none;
+}
+
+.timeline-point {
+  fill: #fff;
+}
+
+.project text {
+  fill: #fff;
+  font-size: 12px;
+  dominant-baseline: middle;
+  text-anchor: middle;
+}
+
+.attendee {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 45px; /* Match the grid rowHeight */
+  padding: 0 24px;
+  position: relative;
+  font-family: monospace;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.attendee-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.attendee-id {
+  color: #F3FD8B;
+  font-size: 18px;
+  font-weight: 300;
+  min-width: 120px;
+}
+
+.attendee-credits {
+  color: #F3FD8B;
+  font-size: 18px;
+  font-weight: 300;
+  text-align: right;
+}
+
+/* .credit-indicator {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #F3FD8B;
+  border-radius: 50%;
+  margin-left: 8px;
+}
+
+.credit-indicator.full {
+  background: #F3FD8B;
+}
+
+.credit-indicator.half {
+  background: linear-gradient(90deg, #F3FD8B 50%, transparent 50%);
+} */
+
+.grid-line {
+  display: none;
+}
+
+.time-label {
+  color: #F3FD8B;
+  font-size: 18px;
+  font-weight: 300;
+  text-transform: uppercase;
+  position: absolute;
+  z-index: 100;
+  letter-spacing: 0;
+  white-space: nowrap;
+  height: 60px;
+  line-height: 60px;
+  padding: 0 4px;
+}
+
+.header-projects-arrow {
+  font-size: 38px;
+  padding-left: 10px;
+  margin-bottom: 2px;
+}
+
+.vote-point {
+  fill: #F3FD8B;
+  transition: r 0.2s ease;
+  z-index: 50;
+}
+
+
+/* Intersection dot styles */
+.intersection-dot {
+  /* Common styling for intersection dots */
+  transition: all 0.2s ease; /* Changed from r to all */
+  stroke: #0001B2;
+  /* Remove r property from here */
+}
+
+.intersection-dot.past {
+  fill: #F3FD8B;
+  stroke: #0001B2;
+  stroke-width: 2px;
+  /* Remove r property from here */
+}
+
+.intersection-dot.future {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 0.5px;
+  /* Remove r property from here */
+}
+
+/* Emoji rain animation styles */
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.emoji-rain {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    animation: fadeOut 2s ease-in forwards;
+    will-change: transform;
+}
+
+.animation-control, .reset-control {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 1, 178, 0.1);
+  border: none;
+  cursor: pointer;
+  margin-right: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s ease, background-color 0.3s ease;
+}
+
+.footer:hover .animation-control,
+.footer:hover .reset-control {
+  opacity: 1;
+}
+
+.animation-control:hover,
+.reset-control:hover {
+  background: rgba(0, 1, 178, 0.3);
+}
+
+.animation-control svg,
+.reset-control svg {
+  width: 20px;
+  height: 20px;
+  fill: #0001B2;
+}
+
+.footer-controls {
+  display: flex;
+  align-items: center;
+}
