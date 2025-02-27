@@ -699,6 +699,7 @@ function drawTimeline(svg, data, timeScale, height) {
  */
 function drawProjects(projects) {
     const projectsContainer = d3.select(".projects-column");
+    const showCurrency = shouldShowCurrency();
     
     // Clear existing projects
     projectsContainer.selectAll(".project").remove();
@@ -723,15 +724,21 @@ function drawProjects(projects) {
         .attr("class", "project-header-left")
         .text((d, i) => getOrdinal(i + 1));
     
-    // Add project matching amount
+    // Add project matching amount or vote count based on URL parameter
     const matchingAmountElements = projectHeaders
         .append("div")
         .attr("class", "project-header-right")
-        .text(d => formatMoney(0)); // Start at 0
+        .text(d => showCurrency ? formatMoney(0) : "0 votes"); // Start at 0, add "votes" text
     
-    // Animate the matching amount
+    // Animate the matching amount or vote count
     matchingAmountElements.each(function(d) {
-        animateNumber(this, 0, d.matchingAmount, 1500, '$');
+        if (showCurrency) {
+            animateNumber(this, 0, d.matchingAmount, 1500, '$');
+        } else {
+            // Count total votes for this project
+            const totalVotes = d.votes.length;
+            animateNumber(this, 0, totalVotes, 1500, '', totalVotes === 1 ? ' vote' : ' votes'); // Add " vote(s)" suffix
+        }
     });
     
     // Add project content
@@ -745,11 +752,19 @@ function drawProjects(projects) {
         .attr("class", "project-name")
         .text(d => d.name);
     
-    // Add project contribution info
+    // Add project contribution info or voter count based on URL parameter
     projectContent
         .append("div")
         .attr("class", "project-path")
-        .text(d => `${d.numberContributions} contributions`);
+        .text(d => {
+            if (showCurrency) {
+                return `${d.numberContributions} contributions`;
+            } else {
+                // Count unique voters (attendees) for this project
+                const uniqueVoters = new Set(d.votes.map(vote => vote.attendeeId)).size;
+                return `${uniqueVoters} voters`;
+            }
+        });
     
     // Calculate positions for connections
     return calculateProjectPositions(projects, projectsContainer);
@@ -1365,6 +1380,7 @@ function drawSingleConnection(voteId, projectId, timeSlot, yPosition) {
  */
 function updateProjectDisplay() {
     const projectsContainer = d3.select(".projects-column");
+    const showCurrency = shouldShowCurrency();
     
     // Get all project elements
     const projectElements = projectsContainer.selectAll(".project");
@@ -1379,13 +1395,33 @@ function updateProjectDisplay() {
         projectElement.select(".project-header-left")
             .text(getOrdinal(index + 1));
         
-        // Update project matching amount with animation
+        // Update project matching amount or vote count with animation
         const matchingAmountElement = projectElement.select(".project-header-right").node();
         if (matchingAmountElement) {
-            // Get current displayed amount (remove $ and commas)
-            const currentAmount = parseInt(matchingAmountElement.textContent.replace(/[$,]/g, '')) || 0;
-            // Animate to new amount
-            animateNumber(matchingAmountElement, currentAmount, project.matchingAmount, 1000, '$');
+            if (showCurrency) {
+                // Get current displayed amount (remove $ and commas)
+                const currentAmount = parseInt(matchingAmountElement.textContent.replace(/[$,]/g, '')) || 0;
+                // Animate to new amount
+                animateNumber(matchingAmountElement, currentAmount, project.matchingAmount, 1000, '$');
+            } else {
+                // Count total votes for this project
+                const totalVotes = project.votes.length;
+                // Get current displayed count (remove "votes" text)
+                const currentText = matchingAmountElement.textContent;
+                const currentCount = parseInt(currentText.replace(' votes', '')) || 0;
+                // Animate to new count with "votes" suffix
+                animateNumber(matchingAmountElement, currentCount, totalVotes, 1000, '', ' votes');
+            }
+        }
+        
+        // Update voter count if not showing currency
+        if (!showCurrency) {
+            const projectPathElement = projectElement.select(".project-path").node();
+            if (projectPathElement) {
+                // Count unique voters (attendees) for this project
+                const uniqueVoters = new Set(project.votes.map(vote => vote.attendeeId)).size;
+                projectPathElement.textContent = `${uniqueVoters} voters`;
+            }
         }
         
         // Reorder the element in the DOM
@@ -1402,17 +1438,24 @@ function shuffleProjects() {
         return;
     }
     
-    // Randomly adjust matching amounts to change ranking
-    currentData.projects.forEach(project => {
-        // Adjust by -20% to +20%
-        const adjustmentFactor = 0.8 + (Math.random() * 0.4);
-        project.matchingAmount = Math.round(project.matchingAmount * adjustmentFactor);
-    });
+    const showCurrency = shouldShowCurrency();
     
-    // Re-sort projects by matching amount
-    currentData.projects.sort((a, b) => b.matchingAmount - a.matchingAmount);
+    if (showCurrency) {
+        // Randomly adjust matching amounts to change ranking
+        currentData.projects.forEach(project => {
+            // Adjust by -20% to +20%
+            const adjustmentFactor = 0.8 + (Math.random() * 0.4);
+            project.matchingAmount = Math.round(project.matchingAmount * adjustmentFactor);
+        });
+        
+        // Re-sort projects by matching amount
+        currentData.projects.sort((a, b) => b.matchingAmount - a.matchingAmount);
+    } else {
+        // Re-sort projects by vote count
+        currentData.projects.sort((a, b) => b.votes.length - a.votes.length);
+    }
     
-    console.log('Projects re-ranked based on new matching amounts');
+    console.log('Projects re-ranked based on new ' + (showCurrency ? 'matching amounts' : 'vote counts'));
 }
 
 // Simple debounce function
@@ -1619,4 +1662,10 @@ function resetScrollPosition() {
             scrollPaused = false;
         }, 500);
     }
+}
+
+// Add this function near the top with other utility functions
+function shouldShowCurrency() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('currency') !== 'false';
 }
