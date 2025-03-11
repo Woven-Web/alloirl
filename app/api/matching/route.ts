@@ -21,13 +21,16 @@ interface ProjectAllocation {
   project_id: string;
   user_id: string;
   votes: number;
+  projects?: any; // Add projects field from Supabase join
 }
 
 interface MatchingResult {
   project_id: string;
+  project_name: string;
   matching_amount: number;
   number_contributions: number;
   contribution_amount: number;
+  percentage: number; // Percentage of the total matching pool
 }
 
 /**
@@ -114,9 +117,11 @@ function calculateMatching(
       totalMatching += matchingAmount;
       results.push({
         project_id: projectId,
+        project_name: 'Unknown Project',
         matching_amount: matchingAmount,
         number_contributions: numContributions,
-        contribution_amount: totalVotes
+        contribution_amount: totalVotes,
+        percentage: 0 // Initialize with 0, will calculate after normalization
       });
     }
   }
@@ -127,6 +132,8 @@ function calculateMatching(
     result.matching_amount *= normalizationFactor;
     // Round to 2 decimal places since this is currency
     result.matching_amount = Math.round(result.matching_amount * 100) / 100;
+    // Calculate percentage (rounded to 2 decimal places)
+    result.percentage = Math.round((result.matching_amount / matchingPool) * 10000) / 100;
   });
 
   return results;
@@ -134,6 +141,11 @@ function calculateMatching(
 
 export async function POST(request: Request) {
   try {
+    // Check if CSV format is requested
+    const url = new URL(request.url);
+    const format = url.searchParams.get('format');
+    const isCSV = format === 'csv';
+
     const { eventId } = await request.json();
     
     if (!eventId) {
@@ -181,6 +193,15 @@ export async function POST(request: Request) {
       );
     }
 
+    // Create a mapping of project IDs to project names
+    const projectNames: Record<string, string> = {};
+    for (const allocation of allocations) {
+      const projects = allocation.projects as any;
+      if (projects && allocation.project_id && !projectNames[allocation.project_id]) {
+        projectNames[allocation.project_id] = projects.name || 'Unknown Project';
+      }
+    }
+
     // Aggregate votes
     const voteDict = aggregateVotes(allocations);
     
@@ -190,7 +211,50 @@ export async function POST(request: Request) {
     // Calculate matching amounts using the dynamic matching pool amount
     const results = calculateMatching(voteDict, pairTotals, THRESHOLD, matchingPool);
 
-    // Add timing metadata to response
+    // Add project names to results
+    results.forEach(result => {
+      result.project_name = projectNames[result.project_id] || 'Unknown Project';
+    });
+
+    // If CSV format is requested, return CSV
+    if (isCSV) {
+      // Define CSV headers
+      const headers = [
+        'project_id',
+        'project_name',
+        'matching_amount',
+        'number_contributions',
+        'contribution_amount',
+        'percentage'
+      ];
+      
+      // Create CSV content
+      let csvContent = headers.join(',') + '\n';
+      
+      // Add each result as a row
+      results.forEach(result => {
+        const row = [
+          result.project_id,
+          `"${result.project_name.replace(/"/g, '""')}"`, // Escape quotes in project names
+          result.matching_amount,
+          result.number_contributions,
+          result.contribution_amount,
+          result.percentage
+        ];
+        csvContent += row.join(',') + '\n';
+      });
+      
+      // Return CSV response with appropriate headers
+      return new Response(csvContent, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="matching_results_${eventId}.csv"`
+        }
+      });
+    }
+
+    // Default: Return JSON response
     return NextResponse.json({
       results,
       metadata: {
