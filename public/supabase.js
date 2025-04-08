@@ -3,7 +3,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 // Initialize Supabase client
 const supabaseUrl = 'https://fudpimvsuddwhpbalpgy.supabase.co'; // Replace with your actual URL
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZHBpbXZzdWRkd2hwYmFscGd5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MDI3NjAzNywiZXhwIjoyMDU1ODUyMDM3fQ.JjokWUheGRzs5_ggnAfab1ss3myQ0NUbtmH6ByWqbJk'; // Replace with your actual key
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ1ZHBpbXZzdWRkd2hwYmFscGd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEyNDE5NzEsImV4cCI6MjA1NjgxNzk3MX0.aOcmu851Xv52a3y2iBvgiKYR31mO5t8qWsPSLL4z4U4'; // Replace with your actual key
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initialize JSConfetti
