@@ -1417,6 +1417,16 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      <div className="flex items-center gap-4">
+        <Link 
+          href={`/dashboard.html?eventId=${eventId}`}
+          target="_blank"
+          className="inline-flex items-center px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 text-base font-medium"
+        >
+          View Realtime Dashboard
+        </Link>
+      </div>
       
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
