@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { ProjectDetails } from "./components/ProjectDetails";
 import { createClient } from "@/utils/supabase/server";
 import { VoteAllocation } from "./components/VoteAllocation";
-import Link from "next/link";
 
 export default async function ProjectPage({
   params,
@@ -76,6 +75,7 @@ export default async function ProjectPage({
             participantData={participantData}
             currentAllocation={currentAllocation?.votes || 0}
             totalVotes={totalVotes}
+            user={user}
           />
         </div>
       )}
