@@ -31,6 +31,7 @@ interface VoteAllocationProps {
   currentAllocation: number;
   totalVotes: number;
   onVoteSuccess?: () => void;
+  user: any;
 }
 
 export function VoteAllocation({
@@ -40,6 +41,7 @@ export function VoteAllocation({
   currentAllocation,
   totalVotes,
   onVoteSuccess,
+  user,
 }: VoteAllocationProps) {
   const [allocatingVotes, setAllocatingVotes] = useState(currentAllocation || 0);
   const [selectedEmoji, setSelectedEmoji] = useState<EmojiOption | null>(null);
@@ -47,6 +49,7 @@ export function VoteAllocation({
   const [localParticipantData, setLocalParticipantData] = useState(participantData);
   const [localCurrentAllocation, setLocalCurrentAllocation] = useState(currentAllocation);
   const supabase = createClient();
+  console.log('participantData', participantData);
 
   // Update local state when props change
   useEffect(() => {
@@ -156,77 +159,96 @@ export function VoteAllocation({
 
   return (
     <div className="flex-1 flex flex-col">
-      <div className="flex-1 space-y-4 overflow-auto">
-        {/* <h2 className="text-brand-blue font-eyebrow text-4xl">Recent Allocations</h2>
-        <div className="space-y-2">
-          {recentAllocations.map((allocation) => (
-            <div key={allocation.id} className="text-brand-blue font-eyebrow text-lg">
-              {allocation.time} | {allocation.user} | {allocation.votes}
-            </div>
-          ))}
-        </div> */}
-      </div>
-
-      <div className="mt-8 pb-8">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex flex-col w-full">
-            <span className="text-brand-blue font-eyebrow text-sm ">
-              {availableVotes} available
-            </span>
-            {/* <span className="text-brand-blue/60 font-eyebrow text-xs">
-              {localCurrentAllocation} currently allocated
-            </span> */}
+      {localParticipantData === null ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center py-12">
+          <div className="text-brand-blue font-eyebrow text-lg mb-2">
+            you're not registered as part of this event yet!
+          </div>
+          <div className="text-brand-blue/80 font-eyebrow text-sm mb-4">
+            please notify an organizer that you'd like to be added
+          </div>
+          <div className="bg-brand-blue/5 rounded-lg p-4 text-left w-full max-w-md mx-auto">
+            <div className="text-brand-blue/80 font-eyebrow text-xs mb-1">email:</div>
+            <div className="text-brand-blue font-mono text-sm mb-2">{user?.email}</div>
+            <div className="text-brand-blue/80 font-eyebrow text-xs mb-1">id:</div>
+            <div className="text-brand-blue font-mono text-xs">{user?.id}</div>
           </div>
         </div>
-        <div className="space-y-4">
-          <div className="flex gap-4">
-            <div className="flex-1 flex items-center gap-2">
-              <NumberInput
-                min={0}
-                max={availableVotes + localCurrentAllocation}
-                onChange={(e) => {
-                  const value = e.target.value === '' ? 0 : parseInt(e.target.value);
-                  setAllocatingVotes(value);
-                }}
-                value={allocatingVotes}
-                className="flex-1"
-              />
-              <span className="text-brand-blue font-eyebrow text-sm whitespace-nowrap">
-                / {voteLimit}
-              </span>
-            </div>
-            <PrimaryButton 
-              onClick={submitAllocation} 
-              disabled={
-                isSubmitting || 
-                allocatingVotes === localCurrentAllocation ||
-                allocatingVotes > (availableVotes + localCurrentAllocation)
-              }
-            >
-              {isSubmitting ? "Allocating..." : "Allocate"}
-            </PrimaryButton>
-          </div>
-          
-          <div className="flex flex-col gap-2">
-            <span className="text-brand-blue font-eyebrow text-sm">Choose a reaction (optional)</span>
-            <div className="flex gap-2">
-              {EMOJI_OPTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => setSelectedEmoji(emoji === selectedEmoji ? null : emoji)}
-                  className={`text-2xl p-2 rounded-lg transition-all ${
-                    emoji === selectedEmoji 
-                      ? 'bg-brand-blue/10 scale-110' 
-                      : 'hover:bg-brand-blue/5'
-                  }`}
-                >
-                  {emoji}
-                </button>
+      ) : (
+        <>
+          <div className="flex-1 space-y-4 overflow-auto">
+            {/* <h2 className="text-brand-blue font-eyebrow text-4xl">Recent Allocations</h2>
+            <div className="space-y-2">
+              {recentAllocations.map((allocation) => (
+                <div key={allocation.id} className="text-brand-blue font-eyebrow text-lg">
+                  {allocation.time} | {allocation.user} | {allocation.votes}
+                </div>
               ))}
+            </div> */}
+          </div>
+
+          <div className="mt-8 pb-8">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col w-full">
+                <span className="text-brand-blue font-eyebrow text-sm ">
+                  {availableVotes} available
+                </span>
+                {/* <span className="text-brand-blue/60 font-eyebrow text-xs">
+                  {localCurrentAllocation} currently allocated
+                </span> */}
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1 flex items-center gap-2">
+                  <NumberInput
+                    min={0}
+                    max={availableVotes + localCurrentAllocation}
+                    onChange={(e) => {
+                      const value = e.target.value === '' ? 0 : parseInt(e.target.value);
+                      setAllocatingVotes(value);
+                    }}
+                    value={allocatingVotes}
+                    className="flex-1"
+                  />
+                  <span className="text-brand-blue font-eyebrow text-sm whitespace-nowrap">
+                    / {voteLimit}
+                  </span>
+                </div>
+                <PrimaryButton 
+                  onClick={submitAllocation} 
+                  disabled={
+                    isSubmitting || 
+                    allocatingVotes === localCurrentAllocation ||
+                    allocatingVotes > (availableVotes + localCurrentAllocation)
+                  }
+                >
+                  {isSubmitting ? "Allocating..." : "Allocate"}
+                </PrimaryButton>
+              </div>
+              
+              <div className="flex flex-col gap-2">
+                <span className="text-brand-blue font-eyebrow text-sm">Choose a reaction (optional)</span>
+                <div className="flex gap-2">
+                  {EMOJI_OPTIONS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => setSelectedEmoji(emoji === selectedEmoji ? null : emoji)}
+                      className={`text-2xl p-2 rounded-lg transition-all ${
+                        emoji === selectedEmoji 
+                          ? 'bg-brand-blue/10 scale-110' 
+                          : 'hover:bg-brand-blue/5'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
