@@ -755,3 +755,156 @@ export const updateUsername = async (formData: FormData) => {
   // Fallback to homepage if no events found
   return { refresh: true, url: '/' };
 };
+
+export const bulkAddToAllowlist = async (eventId: string, emails: string[]) => {
+  try {
+    // Input validation
+    if (!eventId) return { error: "Event ID is required" };
+    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+      return { error: "No valid emails provided" };
+    }
+
+    // Create clients for database operations
+    const supabase = await createClient();
+    const adminClient = await createAdminClient();
+    
+    // Check authorization
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (!user) {
+      return { error: "You must be logged in to perform this action" };
+    }
+    
+    // Check if user is a super admin
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("admin")
+      .eq("id", user.id)
+      .single();
+      
+    if (profileError) {
+      console.error("Error checking admin status:", profileError);
+      return { error: "Failed to verify admin permissions" };
+    }
+    
+    let isAuthorized = profile?.admin === true;
+    
+    // If not a super admin, check if they're an event admin for this event
+    if (!isAuthorized) {
+      const { data: eventParticipant, error: participantError } = await supabase
+        .from("event_participants")
+        .select("admin")
+        .eq("user_id", user.id)
+        .eq("event_id", eventId)
+        .single();
+        
+      if (participantError && participantError.code !== 'PGRST116') {
+        console.error("Error checking event admin status:", participantError);
+        return { error: "Failed to verify event admin permissions" };
+      }
+      
+      isAuthorized = eventParticipant?.admin === true;
+    }
+    
+    // Return error if not authorized
+    if (!isAuthorized) {
+      return { error: "You must be an admin or event admin to add emails to the allowlist" };
+    }
+    
+    // Normalize and validate emails
+    const validEmails = emails
+      .map(email => email.trim().toLowerCase())
+      .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email));
+    
+    if (validEmails.length === 0) {
+      return { error: "No valid emails found" };
+    }
+
+    // Check which emails already exist in the allowlist for this event
+    const { data: existingEntries, error: checkError } = await adminClient
+      .from("event_allowlist")
+      .select("email")
+      .eq("event_id", eventId)
+      .in("email", validEmails);
+    
+    if (checkError) {
+      console.error("Error checking existing allowlist entries:", checkError);
+      return { error: "Failed to check existing entries" };
+    }
+
+    // Create a set of existing emails for quick lookup
+    const existingEmails = new Set(existingEntries?.map(entry => entry.email.toLowerCase()) || []);
+    
+    // Filter out emails that already exist
+    const newEmails = validEmails.filter(email => !existingEmails.has(email));
+    
+    // Prepare results object
+    const results = {
+      total: validEmails.length,
+      added: 0,
+      skipped: existingEmails.size,
+      error: null
+    };
+    
+    // If there are new emails to add, insert them in a single operation
+    if (newEmails.length > 0) {
+      // Prepare the data for bulk insert
+      const entriesToInsert = newEmails.map(email => ({
+        email,
+        event_id: eventId,
+        has_registered: false
+      }));
+      
+      // Perform the bulk insert
+      const { data, error: insertError } = await adminClient
+        .from("event_allowlist")
+        .insert(entriesToInsert)
+        .select("id");
+      
+      if (insertError) {
+        // If the error is about the has_registered column not existing, try without it
+        if (insertError.message?.includes('has_registered') || 
+            insertError.details?.includes('has_registered')) {
+          
+          console.log("has_registered column may not exist, trying without it");
+          
+          // Try again without the has_registered field
+          const basicEntries = newEmails.map(email => ({
+            email,
+            event_id: eventId
+          }));
+          
+          const { data: basicData, error: basicError } = await adminClient
+            .from("event_allowlist")
+            .insert(basicEntries)
+            .select("id");
+          
+          if (basicError) {
+            console.error("Error adding emails to allowlist:", basicError);
+            return { 
+              ...results, 
+              error: "Failed to add emails to allowlist", 
+              errorDetails: basicError 
+            };
+          }
+          
+          results.added = basicData?.length || 0;
+        } else {
+          console.error("Error adding emails to allowlist:", insertError);
+          return { 
+            ...results, 
+            error: "Failed to add emails to allowlist", 
+            errorDetails: insertError 
+          };
+        }
+      } else {
+        results.added = data?.length || 0;
+      }
+    }
+    
+    return results;
+  } catch (err) {
+    console.error("Unexpected error in bulkAddToAllowlist:", err);
+    return { error: "An unexpected error occurred" };
+  }
+};

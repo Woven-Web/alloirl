@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Select } from "@/components/ui/select";
 import Link from "next/link";
+import { bulkAddToAllowlist } from "@/app/actions";
 
 interface EventParticipant {
   id: string;
@@ -29,6 +30,15 @@ interface AllowlistEntry {
   has_registered: boolean;
 }
 
+// Define the response type from bulkAddToAllowlist
+type BulkAddResult = {
+  total?: number;
+  added?: number;
+  skipped?: number;
+  error?: string | null;
+  errorDetails?: any;
+};
+
 export default function AdminDashboard() {
   const params = useParams();
   const router = useRouter();
@@ -39,7 +49,7 @@ export default function AdminDashboard() {
   const [selectedUserId, setSelectedUserId] = useState<string>("");
   const [bulkEmails, setBulkEmails] = useState<string>("");
   const [processing, setProcessing] = useState<boolean>(false);
-  const [importResults, setImportResults] = useState<{added: number, skipped: number, notFound: string[]}>({ added: 0, skipped: 0, notFound: [] });
+  const [importResults, setImportResults] = useState<{total?: number, added?: number, skipped?: number, error?: string | null}>({});
   const [loading, setLoading] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -461,16 +471,14 @@ export default function AdminDashboard() {
     
     setProcessing(true);
     setError(null);
-    setImportResults({ added: 0, skipped: 0, notFound: [] });
-    
-    const supabase = createClient();
+    setImportResults({});
     
     try {
       // Parse emails - split by commas, spaces, or newlines and trim whitespace
       const emailList = bulkEmails
         .split(/[\s,\n]+/)
         .map(email => email.trim())
-        .filter(email => email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)); // Basic email validation
+        .filter(email => email);
       
       if (emailList.length === 0) {
         setError("No valid emails found");
@@ -478,366 +486,21 @@ export default function AdminDashboard() {
         return;
       }
       
-      // Get existing profiles that match these emails
-      const { data: matchedProfiles, error: profilesError } = await supabase
-        .from('profiles')
-        .select('id, email')
-        .in('email', emailList);
+      // Call the server action to handle the bulk import
+      const result = await bulkAddToAllowlist(eventId, emailList) as BulkAddResult;
       
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        setError('Error matching emails to profiles');
-        setProcessing(false);
-        return;
-      }
-      
-      // Create a map of email to user_id
-      const emailToIdMap = new Map(matchedProfiles?.map(p => [p.email.toLowerCase(), p.id]) || []);
-      
-      // Track results
-      const results = { added: 0, skipped: 0, notFound: [] as string[] };
-      
-      // Check if we need to use RLS bypass for allowlist operations
-      // First try to get the current user's role
-      const { data: { user } } = await supabase.auth.getUser();
-      let isAdmin = false;
-      
-      if (user) {
-        // Check if the user has admin privileges in the profiles table
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('admin')
-          .eq('id', user.id)
-          .single();
-          
-        // User is considered an admin if they have admin flag in profiles
-        isAdmin = profile?.admin === true;
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setImportResults(result);
         
-        if (isAdmin) {
-          console.log('User is an admin');
-        } else {
-          console.log('User is not an admin');
-          setError('You need to be an admin to add emails to the allowlist');
-          setProcessing(false);
-          return;
+        // Clear the textarea if successful
+        if (result.added && result.added > 0) {
+          setBulkEmails('');
         }
-      }
-      
-      // Process each email
-      for (const email of emailList) {
-        const normalizedEmail = email.toLowerCase();
-        const userId = emailToIdMap.get(normalizedEmail);
-        const isRegistered = !!userId;
         
-        try {
-          // First check if already in allowlist
-          const { data: existingAllowlist, error: allowlistCheckError } = await supabase
-            .from('event_allowlist')
-            .select('id, has_registered')
-            .eq('email', normalizedEmail)
-            .eq('event_id', eventId)
-            .single();
-          
-          if (allowlistCheckError && allowlistCheckError.code !== 'PGRST116') {
-            // Check for 406 Not Acceptable error
-            if (handle406Error(allowlistCheckError, 'checking allowlist')) {
-              
-              // Try again without using .single()
-              const { data: existingAllowlistArray, error: retryError } = await supabase
-                .from('event_allowlist')
-                .select('id, has_registered')
-                .eq('email', normalizedEmail)
-                .eq('event_id', eventId);
-                
-              if (retryError) {
-                console.error('Error in retry after 406:', retryError);
-                results.notFound.push(email);
-                continue;
-              }
-              
-              // If we found entries, consider it as existing
-              if (existingAllowlistArray && existingAllowlistArray.length > 0) {
-                const existingEntry = existingAllowlistArray[0];
-                // If has_registered exists and matches current status, skip
-                if (existingEntry.has_registered === undefined || existingEntry.has_registered === isRegistered) {
-                  results.skipped++;
-                  continue;
-                }
-                
-                // If has_registered exists but doesn't match, try to update
-                try {
-                  const { error: updateError } = await supabase
-                    .from('event_allowlist')
-                    .update({ has_registered: isRegistered })
-                    .eq('id', existingEntry.id);
-                    
-                  if (updateError) {
-                    // Handle update errors
-                    if (updateError.message?.includes('has_registered') || 
-                        updateError.details?.includes('has_registered')) {
-                      console.warn('has_registered column does not exist, skipping update');
-                      results.skipped++;
-                    } else {
-                      console.error('Error updating allowlist:', updateError);
-                      results.notFound.push(email);
-                    }
-                    continue;
-                  }
-                  
-                  results.added++;
-                  continue;
-                } catch (updateErr) {
-                  console.error('Exception updating allowlist:', updateErr);
-                  results.notFound.push(email);
-                  continue;
-                }
-              }
-            } else 
-            // If the error is about the has_registered column not existing, we'll handle it differently
-            if (allowlistCheckError.message?.includes('has_registered') || 
-                allowlistCheckError.details?.includes('has_registered')) {
-              console.warn('has_registered column may not exist, checking without it');
-              
-              // Try again without requesting has_registered
-              const { data: basicAllowlist, error: basicCheckError } = await supabase
-                .from('event_allowlist')
-                .select('id')
-                .eq('email', normalizedEmail)
-                .eq('event_id', eventId)
-                .single();
-                
-              if (basicCheckError && basicCheckError.code !== 'PGRST116') {
-                // Check for 406 Not Acceptable error
-                if (handle406Error(basicCheckError, 'checking basic allowlist')) {
-                  // We'll assume the entry doesn't exist and continue
-                } else {
-                  console.error('Error checking allowlist (basic):', basicCheckError);
-                  results.notFound.push(email);
-                  continue;
-                }
-              }
-              
-              if (basicAllowlist) {
-                results.skipped++;
-                continue;
-              }
-            } else {
-              console.error('Error checking allowlist:', allowlistCheckError);
-              results.notFound.push(email);
-              continue;
-            }
-          } else if (existingAllowlist) {
-            // If has_registered exists and matches current status, skip
-            if (existingAllowlist.has_registered === undefined || existingAllowlist.has_registered === isRegistered) {
-              results.skipped++;
-              continue;
-            }
-            
-            // If has_registered exists but doesn't match, try to update
-            try {
-              const { error: updateError } = await supabase
-                .from('event_allowlist')
-                .update({ has_registered: isRegistered })
-                .eq('id', existingAllowlist.id);
-                
-              if (updateError) {
-                // If update fails due to column not existing, just skip
-                if (updateError.message?.includes('has_registered') || 
-                    updateError.details?.includes('has_registered')) {
-                  console.warn('has_registered column does not exist, skipping update');
-                  results.skipped++;
-                } else {
-                  console.error('Error updating allowlist:', updateError);
-                  results.notFound.push(email);
-                }
-                continue;
-              }
-              
-              results.added++;
-              continue;
-            } catch (updateErr) {
-              console.error('Exception updating allowlist:', updateErr);
-              results.notFound.push(email);
-              continue;
-            }
-          }
-          
-          // Not in allowlist, add it
-          console.log('Adding to allowlist:', { email: normalizedEmail, event_id: eventId, has_registered: isRegistered });
-          
-          try {
-            // Create the allowlist entry object
-            const allowlistEntry = {
-              email: normalizedEmail,
-              event_id: eventId,
-              has_registered: isRegistered
-            };
-            
-            // First try with normal client
-            const { data, error: allowlistError } = await supabase
-              .from('event_allowlist')
-              .insert(allowlistEntry)
-              .select('id')
-              .single();
-            
-            if (allowlistError) {
-              // Check for 406 Not Acceptable error
-              if (handle406Error(allowlistError, 'inserting to allowlist')) {
-                
-                // Try again without using .single()
-                const { data: insertData, error: retryError } = await supabase
-                  .from('event_allowlist')
-                  .insert(allowlistEntry)
-                  .select('id');
-                  
-                if (retryError) {
-                  console.error('Error in retry after 406:', retryError);
-                  results.notFound.push(email);
-                  continue;
-                }
-                
-                console.log('Successfully added to allowlist (retry):', insertData);
-                results.added++;
-                continue;
-              }
-              
-              // Check if it's an RLS policy error
-              if (allowlistError.code === '42501' || 
-                  (allowlistError.message && allowlistError.message.includes('violates row-level security policy'))) {
-                console.warn('RLS policy error, trying alternative approach');
-                
-                // Log detailed error information for debugging
-                console.error('RLS policy error details:', JSON.stringify(allowlistError));
-                
-                // Set a more helpful error message that mentions both admin options
-                setError(`Unable to add emails to allowlist due to security policy restrictions. 
-                  This operation requires admin privileges. You need to have the admin flag set to true in your profiles record.
-                  Please contact your database administrator to update these permissions.`);
-                
-                results.notFound.push(email);
-                continue;
-              }
-              
-              // If error is about has_registered column, try without it
-              if (allowlistError.message?.includes('has_registered') || 
-                  allowlistError.details?.includes('has_registered')) {
-                console.warn('has_registered column does not exist, trying without it');
-                
-                const basicEntry = {
-                  email: normalizedEmail,
-                  event_id: eventId
-                };
-                
-                const { data: basicData, error: basicError } = await supabase
-                  .from('event_allowlist')
-                  .insert(basicEntry)
-                  .select('id')
-                  .single();
-                  
-                if (basicError) {
-                  // Check for 406 Not Acceptable error
-                  if (handle406Error(basicError, 'adding to basic allowlist')) {
-                    
-                    // Try again without using .single()
-                    const { data: basicInsertData, error: basicRetryError } = await supabase
-                      .from('event_allowlist')
-                      .insert(basicEntry)
-                      .select('id');
-                      
-                    if (basicRetryError) {
-                      console.error('Error in basic retry after 406:', basicRetryError);
-                      results.notFound.push(email);
-                      continue;
-                    }
-                    
-                    console.log('Successfully added to allowlist (basic retry):', basicInsertData);
-                    results.added++;
-                    continue;
-                  }
-                  
-                  // Check if it's an RLS policy error
-                  if (basicError.code === '42501' || 
-                      (basicError.message && basicError.message.includes('violates row-level security policy'))) {
-                    console.error('RLS policy error (basic):', JSON.stringify(basicError));
-                    setError(`Unable to add emails to allowlist due to security policy restrictions. 
-                      This operation requires admin privileges. You need to have the admin flag set to true in your profiles record.
-                      Please contact your database administrator to update these permissions.`);
-                    results.notFound.push(email);
-                    continue;
-                  }
-                  
-                  console.error('Error adding to allowlist (basic):', JSON.stringify(basicError));
-                  results.notFound.push(email);
-                  continue;
-                }
-                
-                console.log('Successfully added to allowlist (basic):', basicData);
-                results.added++;
-              } else {
-                console.error('Error adding to allowlist:', JSON.stringify(allowlistError), 'for email:', normalizedEmail);
-                results.notFound.push(email);
-                continue;
-              }
-            } else {
-              console.log('Successfully added to allowlist:', data);
-              results.added++;
-            }
-          } catch (insertErr) {
-            console.error('Exception adding to allowlist:', insertErr);
-            results.notFound.push(email);
-            continue;
-          }
-          
-          // If user is registered, also add them as a participant
-          if (isRegistered) {
-            // Check if already a participant
-            const { data: existing, error: checkError } = await supabase
-              .from('event_participants')
-              .select('id')
-              .eq('user_id', userId)
-              .eq('event_id', eventId)
-              .single();
-            
-            if (checkError && checkError.code !== 'PGRST116') {
-              console.error('Error checking participant:', checkError);
-              continue;
-            }
-            
-            // Skip if already a participant
-            if (existing) {
-              continue;
-            }
-            
-            // Add new participant
-            const { error: insertError } = await supabase
-              .from('event_participants')
-              .insert({
-                user_id: userId,
-                event_id: eventId,
-                available_votes: 100,
-              });
-            
-            if (insertError) {
-              console.error('Error adding participant:', insertError);
-              continue;
-            }
-          }
-        } catch (emailError) {
-          console.error('Error processing email:', email, emailError);
-          results.notFound.push(email);
-        }
-      }
-      
-      setImportResults(results);
-      
-      // Refresh participant list if any were added
-      if (results.added > 0) {
+        // Refresh the data to show the updated allowlist
         fetchData();
-      }
-      
-      // Clear the textarea if successful
-      if (results.added > 0 && results.notFound.length === 0) {
-        setBulkEmails('');
       }
     } catch (err) {
       console.error('Unexpected error during bulk import:', err);
@@ -1704,8 +1367,7 @@ export default function AdminDashboard() {
                 Paste emails (separated by commas, spaces, or new lines)
               </label>
               <p className="text-sm text-gray-500 mb-2">
-                All emails will be added to the event allowlist. Registered users will also be added as participants.
-                The system tracks which emails belong to registered users.
+                All emails will be added to the event allowlist. When these users register with Allo, they'll automatically become participants.
               </p>
               <textarea
                 id="bulkEmails"
@@ -1719,30 +1381,51 @@ export default function AdminDashboard() {
             <button
               type="submit"
               disabled={processing || !bulkEmails.trim()}
-              className="px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-50"
+              className="px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-50 flex items-center gap-2"
             >
-              {processing ? 'Processing...' : 'Add to Event'}
+              {processing ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </>
+              ) : (
+                'Add to Allowlist'
+              )}
             </button>
           </form>
           
-          {(importResults.added > 0 || importResults.skipped > 0 || importResults.notFound.length > 0) && (
+          {(importResults.added !== undefined || importResults.skipped !== undefined || importResults.error) && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <h3 className="font-medium text-gray-900 mb-2">Import Results:</h3>
               <ul className="space-y-1 text-sm">
-                {importResults.added > 0 && (
-                  <li className="text-green-600">✓ Added or updated {importResults.added} email(s) in the allowlist</li>
+                {importResults.added !== undefined && importResults.added > 0 && (
+                  <li className="text-green-600 flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
+                    </svg>
+                    Added {importResults.added} email{importResults.added === 1 ? '' : 's'} to the allowlist
+                  </li>
                 )}
-                {importResults.skipped > 0 && (
-                  <li className="text-amber-600">⚠ Skipped {importResults.skipped} email(s) already in the allowlist with correct status</li>
+                {importResults.skipped !== undefined && importResults.skipped > 0 && (
+                  <li className="text-amber-600 flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+                    </svg>
+                    Skipped {importResults.skipped} email{importResults.skipped === 1 ? '' : 's'} already in the allowlist
+                  </li>
                 )}
-                {importResults.notFound.length > 0 && (
-                  <li className="text-red-600">
-                    ✗ {importResults.notFound.length} email(s) failed to add:
-                    <ul className="ml-4 mt-1 space-y-1">
-                      {importResults.notFound.map((email, i) => (
-                        <li key={i}>{email}</li>
-                      ))}
-                    </ul>
+                {importResults.total !== undefined && (
+                  <li className="text-gray-600">Total emails processed: {importResults.total}</li>
+                )}
+                {importResults.error && (
+                  <li className="text-red-600 flex items-center gap-2">
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"></path>
+                    </svg>
+                    Error: {importResults.error}
                   </li>
                 )}
               </ul>
